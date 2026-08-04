@@ -1,0 +1,43 @@
+name: Build e Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Gerar o executável (PyInstaller)
+        run: python -m PyInstaller LosManager.spec --clean
+
+      - name: Compactar a build
+        run: Compress-Archive -Path dist\LosManager\* -DestinationPath LosManager.zip
+
+      - name: Criar Release no GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: "Los Manager — build #${{ github.run_number }}"
+          body: |
+            Build automática gerada a partir do commit ${{ github.sha }}.
+          files: LosManager.zip
