@@ -1,0 +1,637 @@
+import customtkinter as ctk
+from tkinter import ttk, messagebox
+from datetime import datetime
+
+from database.conexao import banco
+from utils import impressora
+from utils import config
+from utils import busca
+
+
+class Pedidos(ctk.CTkFrame):
+
+    def __init__(self, master):
+        super().__init__(master)
+
+        self.pack(fill="both", expand=True, padx=15, pady=15)
+
+        self.total = 0.0
+
+        # Lista de itens do pedido em memória (fonte da verdade).
+        # A Treeview é só a exibição; os dados reais ficam aqui.
+        self.itens = []
+
+        self.criar_interface()
+
+        self.carregar_clientes()
+        self.carregar_produtos()
+
+    # ======================================================
+
+    def criar_interface(self):
+
+        titulo = ctk.CTkLabel(
+            self,
+            text="Novo Pedido",
+            font=("Arial", 28, "bold")
+        )
+        titulo.pack(pady=(5, 15))
+
+        topo = ctk.CTkFrame(self)
+        topo.pack(fill="x")
+
+        # ---------------- Cliente ----------------
+
+        ctk.CTkLabel(
+            topo,
+            text="Cliente"
+        ).grid(row=0, column=0, padx=10, pady=10)
+
+        self.combo_cliente = ctk.CTkComboBox(
+            topo,
+            width=300,
+            values=[]
+        )
+        self.combo_cliente.grid(row=0, column=1, padx=10)
+
+        # ---------------- Produto (com busca) ----------------
+
+        ctk.CTkLabel(
+            topo,
+            text="Buscar Produto"
+        ).grid(row=1, column=0, padx=10, pady=10, sticky="n")
+
+        coluna_produto = ctk.CTkFrame(topo, fg_color="transparent")
+        coluna_produto.grid(row=1, column=1, padx=10, pady=10, sticky="w")
+
+        self.busca_produto = ctk.CTkEntry(
+            coluna_produto,
+            width=300,
+            placeholder_text="Digite o nome do produto..."
+        )
+        self.busca_produto.pack(anchor="w")
+        self.busca_produto.bind("<KeyRelease>", self.filtrar_produtos)
+        self.busca_produto.bind("<Down>", self.focar_lista_resultados)
+
+        resultados_frame = ctk.CTkFrame(coluna_produto, fg_color="transparent")
+
+        self.lista_resultados = ttk.Treeview(
+            resultados_frame,
+            columns=("nome", "preco"),
+            show="headings",
+            height=6
+        )
+        self.lista_resultados.heading("nome", text="Produto")
+        self.lista_resultados.heading("preco", text="Preço")
+        self.lista_resultados.column("nome", width=220)
+        self.lista_resultados.column("preco", width=80, anchor="e")
+        self.lista_resultados.bind("<<TreeviewSelect>>", self.selecionar_produto_da_lista)
+        self.lista_resultados.bind("<Double-1>", lambda e: self.quantidade.focus())
+        self.lista_resultados.pack(side="left", fill="both", expand=True)
+
+        scroll_resultados = ctk.CTkScrollbar(
+            resultados_frame,
+            orientation="vertical",
+            command=self.lista_resultados.yview
+        )
+        scroll_resultados.pack(side="left", fill="y")
+        self.lista_resultados.configure(yscrollcommand=scroll_resultados.set)
+
+        self.resultados_frame = resultados_frame
+        # Começa escondida; só aparece quando há resultados de busca
+
+        self.lbl_produto_selecionado = ctk.CTkLabel(
+            coluna_produto,
+            text="Nenhum produto selecionado",
+            font=("Arial", 13, "italic"),
+            text_color="gray"
+        )
+        self.lbl_produto_selecionado.pack(anchor="w", pady=(5, 0))
+
+        self.produto_selecionado = None
+
+        # ---------------- Quantidade ----------------
+
+        ctk.CTkLabel(
+            topo,
+            text="Qtd."
+        ).grid(row=1, column=2, sticky="n", pady=10)
+
+        self.quantidade = ctk.CTkEntry(
+            topo,
+            width=80
+        )
+        self.quantidade.insert(0, "1")
+        self.quantidade.grid(row=1, column=3, sticky="n", pady=10)
+
+        ctk.CTkButton(
+            topo,
+            text="Adicionar",
+            command=self.adicionar_item
+        ).grid(row=1, column=4, padx=15, sticky="n", pady=10)
+
+        ctk.CTkButton(
+            topo,
+            text="Remover selecionado",
+            fg_color="#a33",
+            hover_color="#822",
+            command=self.remover_item
+        ).grid(row=1, column=5, padx=5, sticky="n", pady=10)
+
+        # =========================
+
+        self.tabela = ttk.Treeview(
+            self,
+            columns=("produto", "qtd", "valor", "subtotal"),
+            show="headings",
+            height=12
+        )
+
+        self.tabela.heading("produto", text="Produto")
+        self.tabela.heading("qtd", text="Qtd")
+        self.tabela.heading("valor", text="Valor")
+        self.tabela.heading("subtotal", text="Subtotal")
+
+        self.tabela.column("produto", width=350)
+        self.tabela.column("qtd", width=80, anchor="center")
+        self.tabela.column("valor", width=120, anchor="e")
+        self.tabela.column("subtotal", width=120, anchor="e")
+
+        self.tabela.pack(fill="both", expand=True, pady=15)
+
+        # =========================
+
+        rodape = ctk.CTkFrame(self)
+        rodape.pack(fill="x")
+
+        ctk.CTkLabel(
+            rodape,
+            text="Pagamento"
+        ).grid(row=0, column=0, padx=10)
+
+        self.pagamento = ctk.CTkComboBox(
+            rodape,
+            values=[
+                "PIX",
+                "Dinheiro",
+                "Débito",
+                "Crédito"
+            ],
+            width=180
+        )
+
+        self.pagamento.set("PIX")
+        self.pagamento.grid(row=0, column=1)
+
+        ctk.CTkLabel(
+            rodape,
+            text="Entrega (motoboy)"
+        ).grid(row=0, column=2, padx=(20, 5))
+
+        self.valor_entrega = ctk.CTkEntry(
+            rodape,
+            width=90,
+            placeholder_text="0,00"
+        )
+        self.valor_entrega.grid(row=0, column=3)
+        self.valor_entrega.bind("<KeyRelease>", lambda e: self.atualizar_total())
+
+        self.lbl_total = ctk.CTkLabel(
+            rodape,
+            text="TOTAL: R$ 0,00",
+            font=("Arial", 22, "bold")
+        )
+
+        self.lbl_total.grid(
+            row=0,
+            column=4,
+            padx=40
+        )
+
+        ctk.CTkButton(
+            rodape,
+            text="Finalizar e Imprimir",
+            width=200,
+            fg_color="#2a7",
+            hover_color="#186",
+            command=self.finalizar
+        ).grid(row=0, column=5, padx=20)
+
+    # ======================================================
+
+    def obter_valor_entrega(self):
+
+        texto = self.valor_entrega.get().strip().replace(",", ".")
+
+        if texto == "":
+            return 0.0
+
+        try:
+            valor = float(texto)
+        except ValueError:
+            return 0.0
+
+        return valor if valor > 0 else 0.0
+
+    # ======================================================
+
+    def atualizar_total(self):
+
+        entrega = self.obter_valor_entrega()
+        total_final = self.total + entrega
+
+        self.lbl_total.configure(
+            text=f"TOTAL: R$ {total_final:.2f}"
+        )
+
+    # ======================================================
+
+    def carregar_clientes(self):
+
+        clientes = banco.buscar(
+            "SELECT nome FROM clientes ORDER BY nome"
+        )
+
+        lista = [c[0] for c in clientes]
+
+        if len(lista) == 0:
+            lista = ["Cliente Balcão"]
+        else:
+            lista = ["Cliente Balcão"] + lista
+
+        self.combo_cliente.configure(values=lista)
+        self.combo_cliente.set(lista[0])
+
+    # ======================================================
+
+    def carregar_produtos(self):
+
+        self.produtos_cache = banco.buscar(
+            "SELECT id, nome, preco, estoque FROM produtos WHERE ativo=1 ORDER BY nome"
+        )
+
+    # ======================================================
+
+    def filtrar_produtos(self, evento=None):
+
+        texto = self.busca_produto.get().strip()
+
+        # Esconde a lista se o campo de busca estiver vazio
+        self.resultados_frame.pack_forget()
+
+        for linha in self.lista_resultados.get_children():
+            self.lista_resultados.delete(linha)
+
+        if not texto:
+            return
+
+        prefixo = [
+            p for p in self.produtos_cache
+            if busca.comeca_com(texto, p[1])
+        ]
+
+        meio = [
+            p for p in self.produtos_cache
+            if busca.contem(texto, p[1]) and not busca.comeca_com(texto, p[1])
+        ]
+
+        # Produtos cujo nome começa com o termo aparecem primeiro
+        # (ex: buscar "queijo" mostra "Queijo Mussarela" antes de
+        # "Calabresa com Queijo", mesmo que ambos contenham "queijo")
+        encontrados = prefixo + meio
+
+        if not encontrados:
+            return
+
+        for produto_id, nome, preco, estoque in encontrados[:15]:
+            self.lista_resultados.insert(
+                "", "end",
+                iid=str(produto_id),
+                values=(nome, f"R$ {preco:.2f}")
+            )
+
+        self.resultados_frame.pack(anchor="w", pady=(5, 0), fill="x")
+
+    # ======================================================
+
+    def focar_lista_resultados(self, evento=None):
+
+        filhos = self.lista_resultados.get_children()
+
+        if filhos:
+            self.lista_resultados.focus_set()
+            self.lista_resultados.selection_set(filhos[0])
+            self.lista_resultados.focus(filhos[0])
+
+    # ======================================================
+
+    def selecionar_produto_da_lista(self, evento=None):
+
+        selecionado = self.lista_resultados.selection()
+
+        if not selecionado:
+            return
+
+        produto_id = int(selecionado[0])
+
+        produto = next(
+            (p for p in self.produtos_cache if p[0] == produto_id),
+            None
+        )
+
+        if produto is None:
+            return
+
+        self.produto_selecionado = {
+            "id": produto[0],
+            "nome": produto[1],
+            "preco": produto[2],
+            "estoque": produto[3]
+        }
+
+        self.lbl_produto_selecionado.configure(
+            text=f"✅ {produto[1]}  —  R$ {produto[2]:.2f}  "
+                 f"(estoque: {produto[3]})",
+            text_color="#2a7"
+        )
+
+        self.busca_produto.delete(0, "end")
+        self.resultados_frame.pack_forget()
+        self.quantidade.focus()
+        self.quantidade.select_range(0, "end")
+
+    # ======================================================
+
+    def adicionar_item(self):
+
+        if self.produto_selecionado is None:
+            messagebox.showwarning(
+                "Pedido",
+                "Busque e selecione um produto antes de adicionar."
+            )
+            return
+
+        produto = self.produto_selecionado
+
+        try:
+            qtd = int(self.quantidade.get())
+        except ValueError:
+            messagebox.showwarning("Pedido", "Quantidade inválida.")
+            return
+
+        if qtd <= 0:
+            messagebox.showwarning("Pedido", "Quantidade deve ser maior que zero.")
+            return
+
+        # Soma quanto desse produto já está no carrinho, pra checar o
+        # estoque considerando também o que ainda não foi finalizado.
+        ja_no_carrinho = sum(
+            item["qtd"] for item in self.itens
+            if item["produto_id"] == produto["id"]
+        )
+
+        total_pedido = ja_no_carrinho + qtd
+
+        if produto["estoque"] is not None and total_pedido > produto["estoque"]:
+
+            continuar = messagebox.askyesno(
+                "Estoque insuficiente",
+                f"O produto \"{produto['nome']}\" tem apenas "
+                f"{produto['estoque']} em estoque, mas o pedido ficaria "
+                f"com {total_pedido}.\n\nDeseja adicionar mesmo assim?"
+            )
+
+            if not continuar:
+                return
+
+        subtotal = qtd * produto["preco"]
+
+        self.total += subtotal
+
+        # Guarda o item na lista real (fonte da verdade)
+        self.itens.append({
+            "produto_id": produto["id"],
+            "nome": produto["nome"],
+            "qtd": qtd,
+            "valor_unitario": produto["preco"],
+            "subtotal": subtotal
+        })
+
+        self.tabela.insert(
+            "",
+            "end",
+            values=(
+                produto["nome"],
+                qtd,
+                f"R$ {produto['preco']:.2f}",
+                f"R$ {subtotal:.2f}"
+            )
+        )
+
+        self.atualizar_total()
+        self.produto_selecionado = None
+        self.lbl_produto_selecionado.configure(
+            text="Nenhum produto selecionado",
+            text_color="gray"
+        )
+        self.quantidade.delete(0, "end")
+        self.quantidade.insert(0, "1")
+        self.busca_produto.focus()
+
+    # ======================================================
+
+    def remover_item(self):
+
+        selecionado = self.tabela.selection()
+
+        if not selecionado:
+            return
+
+        indice = self.tabela.index(selecionado[0])
+
+        item_removido = self.itens.pop(indice)
+        self.total -= item_removido["subtotal"]
+
+        self.tabela.delete(selecionado[0])
+
+        self.atualizar_total()
+
+    # ======================================================
+
+    def limpar_pedido(self):
+
+        self.itens = []
+        self.total = 0.0
+
+        for linha in self.tabela.get_children():
+            self.tabela.delete(linha)
+
+        self.lbl_total.configure(text="TOTAL: R$ 0,00")
+
+        self.valor_entrega.delete(0, "end")
+
+        self.combo_cliente.set("Cliente Balcão")
+
+        self.produto_selecionado = None
+        self.lbl_produto_selecionado.configure(
+            text="Nenhum produto selecionado",
+            text_color="gray"
+        )
+        self.busca_produto.delete(0, "end")
+        self.resultados_frame.pack_forget()
+
+        self.quantidade.delete(0, "end")
+        self.quantidade.insert(0, "1")
+
+    # ======================================================
+
+    def proximo_numero_pedido(self):
+
+        resultado = banco.buscar_um(
+            "SELECT MAX(numero) FROM pedidos"
+        )
+
+        maior = resultado[0] if resultado and resultado[0] else 0
+
+        return maior + 1
+
+    # ======================================================
+
+    def gravar_pedido(self):
+        """Grava o pedido e os itens no banco. Retorna o dicionário
+        com os dados do pedido (usado depois para imprimir)."""
+
+        nome_cliente = self.combo_cliente.get()
+
+        cliente = banco.buscar_um(
+            "SELECT id FROM clientes WHERE nome=?",
+            (nome_cliente,)
+        )
+
+        cliente_id = cliente[0] if cliente else None
+
+        agora = datetime.now()
+        data_str = agora.strftime("%d/%m/%Y")
+        hora_str = agora.strftime("%H:%M")
+
+        numero = self.proximo_numero_pedido()
+        pagamento = self.pagamento.get()
+
+        entrega = self.obter_valor_entrega()
+        total_final = self.total + entrega
+
+        # Pedido + itens + baixa de estoque viram uma transação só: se
+        # algo falhar no meio, desfaz tudo (rollback) em vez de deixar
+        # um pedido gravado pela metade.
+
+        try:
+            banco.executar_sem_commit(
+                """
+                INSERT INTO pedidos
+                    (numero, cliente_id, data, hora, subtotal,
+                     desconto, acrescimo, total, pagamento, status, observacao)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    numero, cliente_id, data_str, hora_str, self.total,
+                    0.0, entrega, total_final, pagamento, "Finalizado", ""
+                )
+            )
+
+            pedido_id = banco.ultimo_id()
+
+            for item in self.itens:
+
+                banco.executar_sem_commit(
+                    """
+                    INSERT INTO itens_pedido
+                        (pedido_id, produto_id, quantidade, valor_unitario, subtotal)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        pedido_id, item["produto_id"], item["qtd"],
+                        item["valor_unitario"], item["subtotal"]
+                    )
+                )
+
+                # Desconta o estoque vendido. Não deixa ficar negativo no banco.
+                banco.executar_sem_commit(
+                    """
+                    UPDATE produtos
+                    SET estoque = MAX(0, estoque - ?)
+                    WHERE id = ?
+                    """,
+                    (item["qtd"], item["produto_id"])
+                )
+
+        except Exception:
+            banco.rollback()
+            raise
+
+        banco.commit()
+
+        # Atualiza o cache local de produtos pra já refletir o novo
+        # estoque na próxima busca, sem precisar reabrir a tela.
+        self.carregar_produtos()
+
+        return {
+            "numero": numero,
+            "cliente": nome_cliente,
+            "data": data_str,
+            "hora": hora_str,
+            "subtotal": self.total,
+            "desconto": 0.0,
+            "acrescimo": entrega,
+            "total": total_final,
+            "pagamento": pagamento,
+            "observacao": ""
+        }
+
+    # ======================================================
+
+    def finalizar(self):
+
+        if len(self.itens) == 0:
+
+            messagebox.showwarning(
+                "Pedido",
+                "Nenhum produto foi adicionado."
+            )
+
+            return
+
+        try:
+            pedido_dados = self.gravar_pedido()
+
+        except Exception as erro:
+
+            messagebox.showerror(
+                "Erro ao gravar pedido",
+                f"Não foi possível salvar o pedido no banco:\n\n{erro}"
+            )
+
+            return
+
+        # -------- Tenta imprimir; se falhar, avisa mas NÃO perde o pedido --------
+        # (o pedido já foi salvo no banco mesmo se a impressora falhar)
+
+        try:
+            dados_loja = config.obter_dados_loja()
+            impressora.imprimir_cupom(dados_loja, pedido_dados, self.itens)
+
+            messagebox.showinfo(
+                "Los Manager",
+                f"Pedido Nº {pedido_dados['numero']:04d} salvo e enviado para impressão!"
+            )
+
+        except Exception as erro:
+
+            messagebox.showwarning(
+                "Pedido salvo, mas houve erro ao imprimir",
+                f"O pedido Nº {pedido_dados['numero']:04d} foi salvo normalmente, "
+                f"mas não foi possível imprimir o cupom:\n\n{erro}\n\n"
+                "Verifique se a impressora está ligada, instalada no Windows "
+                "e se o nome em utils/impressora.py está correto."
+            )
+
+        self.limpar_pedido()

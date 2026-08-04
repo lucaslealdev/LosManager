@@ -1,0 +1,8 @@
+losmanager.db
+backups/
+
+dist/
+build/
+
+__pycache__/
+*.pyc
