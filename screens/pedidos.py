@@ -6,6 +6,7 @@ from database.conexao import banco
 from utils import impressora
 from utils import config
 from utils import busca
+from utils import responsivo
 
 
 class Pedidos(ctk.CTkFrame):
@@ -201,27 +202,9 @@ class Pedidos(ctk.CTkFrame):
         ).grid(row=1, column=5, padx=5, sticky="n", pady=10)
 
         # =========================
-
-        self.tabela = ttk.Treeview(
-            self.scroll,
-            columns=("produto", "qtd", "valor", "subtotal"),
-            show="headings",
-            height=12
-        )
-
-        self.tabela.heading("produto", text="Produto")
-        self.tabela.heading("qtd", text="Qtd")
-        self.tabela.heading("valor", text="Valor")
-        self.tabela.heading("subtotal", text="Subtotal")
-
-        self.tabela.column("produto", width=350)
-        self.tabela.column("qtd", width=80, anchor="center")
-        self.tabela.column("valor", width=120, anchor="e")
-        self.tabela.column("subtotal", width=120, anchor="e")
-
-        self.tabela.pack(fill="both", expand=True, pady=15)
-
-        # =========================
+        # Rodapé é criado (e empacotado) antes da tabela do carrinho só
+        # para medir sua altura real; a tabela é inserida visualmente
+        # ANTES dele via pack(before=...) logo abaixo.
 
         rodape = ctk.CTkFrame(self.scroll)
         rodape.pack(fill="x")
@@ -278,6 +261,34 @@ class Pedidos(ctk.CTkFrame):
             hover_color="#186",
             command=self.finalizar
         ).grid(row=0, column=5, padx=20)
+
+        # ---------------- Tabela do carrinho ----------------
+        # Vem por último na construção (pra já poder medir a altura do
+        # rodapé acima), mas é inserida visualmente antes dele via
+        # pack(before=...).
+
+        linhas = responsivo.linhas_para_tabela(self, self.scroll, pady_tabela=15)
+
+        self.tabela = ttk.Treeview(
+            self.scroll,
+            columns=("produto", "qtd", "valor", "subtotal"),
+            show="headings",
+            height=linhas
+        )
+
+        self.tabela.heading("produto", text="Produto")
+        self.tabela.heading("qtd", text="Qtd")
+        self.tabela.heading("valor", text="Valor")
+        self.tabela.heading("subtotal", text="Subtotal")
+
+        self.tabela.column("produto", width=350)
+        self.tabela.column("qtd", width=80, anchor="center")
+        self.tabela.column("valor", width=120, anchor="e")
+        self.tabela.column("subtotal", width=120, anchor="e")
+
+        self.tabela.pack(fill="both", expand=True, pady=15, before=rodape)
+
+        responsivo.tornar_dinamica(self, self.scroll, lambda: self.tabela, pady_tabela=15)
 
     # ======================================================
 
