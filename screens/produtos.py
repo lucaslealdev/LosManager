@@ -485,13 +485,37 @@ class JanelaReceita(ctk.CTkToplevel):
         self.quantidade = ctk.CTkEntry(formulario, width=80)
         self.quantidade.grid(row=0, column=3, padx=5)
 
-        ctk.CTkButton(
-            self,
+        botoes_form = ctk.CTkFrame(self, fg_color="transparent")
+        botoes_form.pack(pady=(5, 10))
+
+        self.btn_adicionar = ctk.CTkButton(
+            botoes_form,
             text="Adicionar à Receita",
             fg_color=tema.COR_LARANJA,
             hover_color=tema.COR_LARANJA_ESCURO,
             command=self.adicionar
-        ).pack(pady=(5, 10))
+        )
+        self.btn_adicionar.pack(side="left", padx=(0, 10))
+
+        self.btn_cancelar_edicao = ctk.CTkButton(
+            botoes_form,
+            text="Cancelar edição",
+            fg_color="gray40",
+            hover_color="gray30",
+            command=self.cancelar_edicao
+        )
+        # Só aparece quando um ingrediente da lista está selecionado para edição
+
+        self.receita_id_editando = None
+
+        dica_edicao = ctk.CTkLabel(
+            self,
+            text="Dica: clique numa linha da lista abaixo para carregar ela nos "
+                 "campos acima e corrigir a quantidade.",
+            font=("Arial", 12),
+            text_color="gray"
+        )
+        dica_edicao.pack(pady=(0, 5))
 
         self.tabela = ttk.Treeview(
             self,
@@ -513,6 +537,8 @@ class JanelaReceita(ctk.CTkToplevel):
         self.tabela.column("unidade", width=100, anchor="center")
 
         self.tabela.pack(fill="both", expand=True, padx=15, pady=(0, 10))
+
+        self.tabela.bind("<<TreeviewSelect>>", self.carregar_para_edicao)
 
         ctk.CTkButton(
             self,
@@ -594,7 +620,45 @@ class JanelaReceita(ctk.CTkToplevel):
             )
 
         self.quantidade.delete(0, "end")
+        self.receita_id_editando = None
+        self.btn_adicionar.configure(text="Adicionar à Receita")
+        self.btn_cancelar_edicao.pack_forget()
         self.carregar()
+
+    # ======================================================
+
+    def carregar_para_edicao(self, evento=None):
+
+        selecionado = self.tabela.selection()
+
+        if not selecionado:
+            return
+
+        valores = self.tabela.item(selecionado[0], "values")
+        receita_id, nome_ingrediente, quantidade, _unidade = valores
+
+        self.receita_id_editando = receita_id
+
+        self.combo_ingrediente.set(nome_ingrediente)
+
+        self.quantidade.delete(0, "end")
+        self.quantidade.insert(0, str(quantidade).replace(".", ","))
+
+        self.btn_adicionar.configure(text="Atualizar Ingrediente")
+        self.btn_cancelar_edicao.pack(side="left")
+
+    # ======================================================
+
+    def cancelar_edicao(self):
+
+        self.receita_id_editando = None
+
+        self.quantidade.delete(0, "end")
+
+        self.btn_adicionar.configure(text="Adicionar à Receita")
+        self.btn_cancelar_edicao.pack_forget()
+
+        self.tabela.selection_remove(self.tabela.selection())
 
     # ======================================================
 
@@ -610,6 +674,9 @@ class JanelaReceita(ctk.CTkToplevel):
         receita_id = valores[0]
 
         banco.executar("DELETE FROM receita_produto WHERE id=?", (receita_id,))
+
+        if receita_id == self.receita_id_editando:
+            self.cancelar_edicao()
 
         self.carregar()
 
