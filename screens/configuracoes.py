@@ -413,10 +413,10 @@ class Configuracoes(ctk.CTkFrame):
             )
             return
 
-        if atualizacao.obter_build_atual() is None:
+        if atualizacao.obter_versao_atual() is None:
             messagebox.showwarning(
                 "Verificar Atualização",
-                "Não foi possível identificar o número da build deste "
+                "Não foi possível identificar a versão deste "
                 ".exe (ele não foi gerado pela Action do GitHub)."
             )
             return
@@ -430,16 +430,16 @@ class Configuracoes(ctk.CTkFrame):
 
     # ======================================================
 
-    def _resultado_atualizacao(self, build_atual, build_nova, url_release):
+    def _resultado_atualizacao(self, versao_atual, versao_nova, url_release):
 
         self.lbl_status.configure(text="")
 
-        if build_nova > build_atual:
+        if versao_nova > versao_atual:
 
             abrir = messagebox.askyesno(
                 "Atualização disponível",
-                f"Você está usando a build #{build_atual}.\n"
-                f"A build #{build_nova} já está disponível no GitHub.\n\n"
+                f"Você está usando a versão {atualizacao.formatar_versao(versao_atual)}.\n"
+                f"A versão {atualizacao.formatar_versao(versao_nova)} já está disponível no GitHub.\n\n"
                 "Deseja abrir a página de download agora?"
             )
 
@@ -450,7 +450,8 @@ class Configuracoes(ctk.CTkFrame):
 
             messagebox.showinfo(
                 "Verificar Atualização",
-                f"Você já está com a versão mais recente (build #{build_atual})."
+                f"Você já está com a versão mais recente "
+                f"({atualizacao.formatar_versao(versao_atual)})."
             )
 
     # ======================================================

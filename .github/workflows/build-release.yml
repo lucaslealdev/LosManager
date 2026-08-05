@@ -27,9 +27,17 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Gravar número da build (lido pelo app em tempo de execução)
-        shell: pwsh
-        run: Set-Content -Path assets\versao.txt -Value "${{ github.run_number }}" -NoNewline -Encoding utf8
+      - name: Calcular a versão semântica desta build
+        # MAJOR.MINOR vêm do arquivo VERSION (versionado no repositório,
+        # ajustado à mão quando uma mudança realmente merece um novo
+        # major/minor); PATCH é o número sequencial da própria Action,
+        # então toda build ainda gera uma versão nova e única sem
+        # precisar editar o VERSION a cada push.
+        run: |
+          $base = (Get-Content VERSION -Raw).Trim()
+          $versao = "$base.${{ github.run_number }}"
+          "VERSAO=$versao" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Set-Content -Path assets\versao.txt -Value $versao -NoNewline -Encoding utf8
 
       - name: Gerar o executável (PyInstaller)
         run: python -m PyInstaller LosManager.spec --clean
@@ -40,8 +48,8 @@ jobs:
       - name: Criar Release no GitHub
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: "Los Manager — build #${{ github.run_number }}"
+          tag_name: v${{ env.VERSAO }}
+          name: "Los Manager — v${{ env.VERSAO }}"
           body: |
             Build automática gerada a partir do commit ${{ github.sha }}.
           files: LosManager.zip

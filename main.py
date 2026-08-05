@@ -64,25 +64,25 @@ class LosManager(ctk.CTk):
     # ==================================================
 
     def verificar_atualizacao(self):
-        """Confere em segundo plano se já tem uma build mais nova no
+        """Confere em segundo plano se já tem uma versão mais nova no
         GitHub. Só avisa o usuário se REALMENTE houver uma (fica quieto
         se já estiver atualizado, sem internet, ou rodando via `python
         main.py`) — ver utils/atualizacao.py."""
 
         atualizacao.verificar_silenciosamente(self._notificar_atualizacao)
 
-    def _notificar_atualizacao(self, build_atual, build_nova, url_release):
+    def _notificar_atualizacao(self, versao_atual, versao_nova, url_release):
 
         # Chamado de dentro da thread de rede: precisa voltar pra
         # thread principal do Tkinter antes de mexer na interface.
-        self.after(0, lambda: self._mostrar_aviso_atualizacao(build_atual, build_nova, url_release))
+        self.after(0, lambda: self._mostrar_aviso_atualizacao(versao_atual, versao_nova, url_release))
 
-    def _mostrar_aviso_atualizacao(self, build_atual, build_nova, url_release):
+    def _mostrar_aviso_atualizacao(self, versao_atual, versao_nova, url_release):
 
         abrir = messagebox.askyesno(
             "Atualização disponível",
-            f"Você está usando a build #{build_atual}.\n"
-            f"A build #{build_nova} já está disponível no GitHub.\n\n"
+            f"Você está usando a versão {atualizacao.formatar_versao(versao_atual)}.\n"
+            f"A versão {atualizacao.formatar_versao(versao_nova)} já está disponível no GitHub.\n\n"
             "Deseja abrir a página de download agora?"
         )
 
