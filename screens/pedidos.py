@@ -46,19 +46,75 @@ class Pedidos(ctk.CTkFrame):
         topo = ctk.CTkFrame(self.scroll)
         topo.pack(fill="x")
 
-        # ---------------- Cliente ----------------
+        # ---------------- Cliente (com busca, igual produto) ----------------
+        # Faz a mesma busca por nome/telefone em vez de um combobox com
+        # todos os clientes — com centenas de clientes cadastrados, rolar
+        # uma lista enorme pra achar um fica inviável.
 
         ctk.CTkLabel(
             topo,
             text="Cliente"
-        ).grid(row=0, column=0, padx=10, pady=10)
+        ).grid(row=0, column=0, padx=10, pady=10, sticky="n")
 
-        self.combo_cliente = ctk.CTkComboBox(
-            topo,
-            width=300,
-            values=[]
+        coluna_cliente = ctk.CTkFrame(topo, fg_color="transparent")
+        coluna_cliente.grid(row=0, column=1, padx=10, pady=10, sticky="w")
+
+        linha_busca_cliente = ctk.CTkFrame(coluna_cliente, fg_color="transparent")
+        linha_busca_cliente.pack(anchor="w", fill="x")
+
+        self.busca_cliente = ctk.CTkEntry(
+            linha_busca_cliente,
+            width=230,
+            placeholder_text="Buscar por nome ou telefone..."
         )
-        self.combo_cliente.grid(row=0, column=1, padx=10)
+        self.busca_cliente.pack(side="left")
+        self.busca_cliente.bind("<KeyRelease>", self.filtrar_clientes)
+        self.busca_cliente.bind("<Down>", self.focar_lista_resultados_cliente)
+
+        ctk.CTkButton(
+            linha_busca_cliente,
+            text="Balcão",
+            width=65,
+            fg_color="gray40",
+            hover_color="gray30",
+            command=self.selecionar_cliente_balcao
+        ).pack(side="left", padx=(8, 0))
+
+        resultados_cliente_frame = ctk.CTkFrame(coluna_cliente, fg_color="transparent")
+
+        self.lista_resultados_cliente = ttk.Treeview(
+            resultados_cliente_frame,
+            columns=("nome", "telefone"),
+            show="headings",
+            height=6
+        )
+        self.lista_resultados_cliente.heading("nome", text="Cliente")
+        self.lista_resultados_cliente.heading("telefone", text="Telefone")
+        self.lista_resultados_cliente.column("nome", width=200)
+        self.lista_resultados_cliente.column("telefone", width=110)
+        self.lista_resultados_cliente.bind("<<TreeviewSelect>>", self.selecionar_cliente_da_lista)
+        self.lista_resultados_cliente.pack(side="left", fill="both", expand=True)
+
+        scroll_resultados_cliente = ctk.CTkScrollbar(
+            resultados_cliente_frame,
+            orientation="vertical",
+            command=self.lista_resultados_cliente.yview
+        )
+        scroll_resultados_cliente.pack(side="left", fill="y")
+        self.lista_resultados_cliente.configure(yscrollcommand=scroll_resultados_cliente.set)
+
+        self.resultados_cliente_frame = resultados_cliente_frame
+        # Começa escondida; só aparece quando há resultados de busca
+
+        self.cliente_selecionado = None  # None = Cliente Balcão
+
+        self.lbl_cliente_selecionado = ctk.CTkLabel(
+            coluna_cliente,
+            text="🧍 Cliente Balcão",
+            font=("Arial", 13, "italic"),
+            text_color="gray"
+        )
+        self.lbl_cliente_selecionado.pack(anchor="w", pady=(5, 0))
 
         # ---------------- Produto (com busca) ----------------
 
@@ -254,19 +310,112 @@ class Pedidos(ctk.CTkFrame):
 
     def carregar_clientes(self):
 
-        clientes = banco.buscar(
-            "SELECT nome FROM clientes ORDER BY nome"
+        self.clientes_cache = banco.buscar(
+            "SELECT id, nome, telefone FROM clientes ORDER BY nome"
         )
 
-        lista = [c[0] for c in clientes]
+    # ======================================================
 
-        if len(lista) == 0:
-            lista = ["Cliente Balcão"]
-        else:
-            lista = ["Cliente Balcão"] + lista
+    def filtrar_clientes(self, evento=None):
 
-        self.combo_cliente.configure(values=lista)
-        self.combo_cliente.set(lista[0])
+        texto = self.busca_cliente.get().strip()
+
+        # Esconde a lista se o campo de busca estiver vazio
+        self.resultados_cliente_frame.pack_forget()
+
+        for linha in self.lista_resultados_cliente.get_children():
+            self.lista_resultados_cliente.delete(linha)
+
+        if not texto:
+            return
+
+        prefixo = [
+            c for c in self.clientes_cache
+            if busca.comeca_com(texto, c[1])
+        ]
+
+        meio = [
+            c for c in self.clientes_cache
+            if busca.contem(texto, c[1]) and not busca.comeca_com(texto, c[1])
+        ]
+
+        # Também acha por telefone (contém, sem distinção de prefixo)
+        por_telefone = [
+            c for c in self.clientes_cache
+            if busca.contem(texto, c[2]) and c not in prefixo and c not in meio
+        ]
+
+        encontrados = prefixo + meio + por_telefone
+
+        if not encontrados:
+            return
+
+        for cliente_id, nome, telefone in encontrados[:15]:
+            self.lista_resultados_cliente.insert(
+                "", "end",
+                iid=str(cliente_id),
+                values=(nome, telefone or "")
+            )
+
+        self.resultados_cliente_frame.pack(anchor="w", pady=(5, 0), fill="x")
+
+    # ======================================================
+
+    def focar_lista_resultados_cliente(self, evento=None):
+
+        filhos = self.lista_resultados_cliente.get_children()
+
+        if filhos:
+            self.lista_resultados_cliente.focus_set()
+            self.lista_resultados_cliente.selection_set(filhos[0])
+            self.lista_resultados_cliente.focus(filhos[0])
+
+    # ======================================================
+
+    def selecionar_cliente_da_lista(self, evento=None):
+
+        selecionado = self.lista_resultados_cliente.selection()
+
+        if not selecionado:
+            return
+
+        cliente_id = int(selecionado[0])
+
+        cliente = next(
+            (c for c in self.clientes_cache if c[0] == cliente_id),
+            None
+        )
+
+        if cliente is None:
+            return
+
+        self.cliente_selecionado = {
+            "id": cliente[0],
+            "nome": cliente[1],
+            "telefone": cliente[2]
+        }
+
+        self.lbl_cliente_selecionado.configure(
+            text=f"✅ {cliente[1]}" + (f"  —  {cliente[2]}" if cliente[2] else ""),
+            text_color="#2a7"
+        )
+
+        self.busca_cliente.delete(0, "end")
+        self.resultados_cliente_frame.pack_forget()
+
+    # ======================================================
+
+    def selecionar_cliente_balcao(self):
+
+        self.cliente_selecionado = None
+
+        self.busca_cliente.delete(0, "end")
+        self.resultados_cliente_frame.pack_forget()
+
+        self.lbl_cliente_selecionado.configure(
+            text="🧍 Cliente Balcão",
+            text_color="gray"
+        )
 
     # ======================================================
 
@@ -557,7 +706,7 @@ class Pedidos(ctk.CTkFrame):
 
         self.valor_entrega.delete(0, "end")
 
-        self.combo_cliente.set("Cliente Balcão")
+        self.selecionar_cliente_balcao()
 
         self.produto_selecionado = None
         self.lbl_produto_selecionado.configure(
@@ -588,14 +737,8 @@ class Pedidos(ctk.CTkFrame):
         """Grava o pedido e os itens no banco. Retorna o dicionário
         com os dados do pedido (usado depois para imprimir)."""
 
-        nome_cliente = self.combo_cliente.get()
-
-        cliente = banco.buscar_um(
-            "SELECT id FROM clientes WHERE nome=?",
-            (nome_cliente,)
-        )
-
-        cliente_id = cliente[0] if cliente else None
+        nome_cliente = self.cliente_selecionado["nome"] if self.cliente_selecionado else "Cliente Balcão"
+        cliente_id = self.cliente_selecionado["id"] if self.cliente_selecionado else None
 
         agora = datetime.now()
         data_str = agora.strftime("%d/%m/%Y")
