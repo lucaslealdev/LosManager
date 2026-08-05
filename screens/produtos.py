@@ -511,9 +511,12 @@ class JanelaReceita(ctk.CTkToplevel):
         dica_edicao = ctk.CTkLabel(
             self,
             text="Dica: clique numa linha da lista abaixo para carregar ela nos "
-                 "campos acima e corrigir a quantidade.",
+                 "campos acima e corrigir a quantidade, ou use o botão vermelho "
+                 "no final da janela para remover essa linha da receita.",
             font=("Arial", 12),
-            text_color="gray"
+            text_color="gray",
+            wraplength=500,
+            justify="center"
         )
         dica_edicao.pack(pady=(0, 5))
 
@@ -671,7 +674,18 @@ class JanelaReceita(ctk.CTkToplevel):
             return
 
         valores = self.tabela.item(selecionado[0], "values")
-        receita_id = valores[0]
+        receita_id, nome_ingrediente, _quantidade, _unidade = valores
+
+        confirmar = messagebox.askyesno(
+            "Remover da Receita",
+            f"Remover \"{nome_ingrediente}\" da receita deste produto?\n\n"
+            "Isso só tira o ingrediente DESSA receita — o cadastro do "
+            "ingrediente em si continua existindo normalmente na aba "
+            "\"Ingredientes\" e em qualquer outra receita que o use."
+        )
+
+        if not confirmar:
+            return
 
         banco.executar("DELETE FROM receita_produto WHERE id=?", (receita_id,))
 
@@ -679,6 +693,8 @@ class JanelaReceita(ctk.CTkToplevel):
             self.cancelar_edicao()
 
         self.carregar()
+
+        messagebox.showinfo("Receita", f"\"{nome_ingrediente}\" foi removido da receita.")
 
     # ======================================================
 
