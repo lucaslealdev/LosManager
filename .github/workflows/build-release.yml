@@ -27,6 +27,10 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Gravar número da build (lido pelo app em tempo de execução)
+        shell: pwsh
+        run: Set-Content -Path assets\versao.txt -Value "${{ github.run_number }}" -NoNewline -Encoding utf8
+
       - name: Gerar o executável (PyInstaller)
         run: python -m PyInstaller LosManager.spec --clean
 

@@ -1,4 +1,6 @@
 import customtkinter as ctk
+from tkinter import messagebox
+import webbrowser
 from PIL import Image
 
 from database.conexao import banco
@@ -12,6 +14,7 @@ from screens.caixa import Caixa
 from screens.relatorios import Relatorios
 from utils import config
 from utils import tema
+from utils import atualizacao
 
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("blue")
@@ -32,6 +35,8 @@ class LosManager(ctk.CTk):
         _ = banco
 
         self.fazer_backup_inicial()
+
+        self.verificar_atualizacao()
 
         self.definir_icone()
 
@@ -55,6 +60,34 @@ class LosManager(ctk.CTk):
             config.fazer_backup_banco()
         except Exception as e:
             print(f"[ERRO BACKUP] {e}")
+
+    # ==================================================
+
+    def verificar_atualizacao(self):
+        """Confere em segundo plano se já tem uma build mais nova no
+        GitHub. Só avisa o usuário se REALMENTE houver uma (fica quieto
+        se já estiver atualizado, sem internet, ou rodando via `python
+        main.py`) — ver utils/atualizacao.py."""
+
+        atualizacao.verificar_silenciosamente(self._notificar_atualizacao)
+
+    def _notificar_atualizacao(self, build_atual, build_nova, url_release):
+
+        # Chamado de dentro da thread de rede: precisa voltar pra
+        # thread principal do Tkinter antes de mexer na interface.
+        self.after(0, lambda: self._mostrar_aviso_atualizacao(build_atual, build_nova, url_release))
+
+    def _mostrar_aviso_atualizacao(self, build_atual, build_nova, url_release):
+
+        abrir = messagebox.askyesno(
+            "Atualização disponível",
+            f"Você está usando a build #{build_atual}.\n"
+            f"A build #{build_nova} já está disponível no GitHub.\n\n"
+            "Deseja abrir a página de download agora?"
+        )
+
+        if abrir:
+            webbrowser.open(url_release)
 
     # ==================================================
 

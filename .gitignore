@@ -3,6 +3,7 @@ backups/
 
 dist/
 build/
+assets/versao.txt
 
 __pycache__/
 *.pyc

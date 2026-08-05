@@ -2,9 +2,13 @@ import customtkinter as ctk
 from tkinter import messagebox
 from datetime import datetime
 
+import sys
+import webbrowser
+
 from utils import config
 from utils import impressora
 from utils import tema
+from utils import atualizacao
 
 
 class Configuracoes(ctk.CTkFrame):
@@ -196,6 +200,16 @@ class Configuracoes(ctk.CTkFrame):
             command=self.fazer_backup_manual
         ).pack(side="left", padx=10)
 
+        ctk.CTkButton(
+            acoes,
+            text="🔄 Verificar Atualização",
+            width=220,
+            height=42,
+            fg_color=tema.COR_TEXTO_CLARO,
+            hover_color=tema.COR_TEXTO,
+            command=self.verificar_atualizacao_manual
+        ).pack(side="left", padx=10)
+
         self.lbl_status = ctk.CTkLabel(self, text="", font=("Arial", 13))
         self.lbl_status.pack(pady=(5, 0))
 
@@ -208,7 +222,7 @@ class Configuracoes(ctk.CTkFrame):
 
         ctk.CTkLabel(
             rodape,
-            text="Los Manager — versão 2.0",
+            text=atualizacao.texto_versao(),
             font=("Arial", 12, "bold"),
             text_color=tema.COR_TEXTO_CLARO
         ).pack()
@@ -376,3 +390,70 @@ class Configuracoes(ctk.CTkFrame):
                 "Erro ao fazer backup",
                 f"Não foi possível fazer o backup do banco de dados:\n\n{erro}"
             )
+
+    # ======================================================
+
+    def verificar_atualizacao_manual(self):
+        """Checagem de atualização pedida na mão pelo usuário — ao
+        contrário da checagem automática do startup, essa sempre dá uma
+        resposta visível (achou, não achou, ou deu erro)."""
+
+        if not getattr(sys, "frozen", False):
+            messagebox.showinfo(
+                "Verificar Atualização",
+                "A checagem de atualização só funciona na versão "
+                "compilada (.exe), baixada do GitHub."
+            )
+            return
+
+        if atualizacao.obter_build_atual() is None:
+            messagebox.showwarning(
+                "Verificar Atualização",
+                "Não foi possível identificar o número da build deste "
+                ".exe (ele não foi gerado pela Action do GitHub)."
+            )
+            return
+
+        self.lbl_status.configure(text="🔎 Verificando atualização...", text_color="gray")
+
+        atualizacao.verificar_manualmente(
+            lambda atual, nova, url: self.after(0, lambda: self._resultado_atualizacao(atual, nova, url)),
+            lambda erro: self.after(0, lambda: self._erro_atualizacao(erro))
+        )
+
+    # ======================================================
+
+    def _resultado_atualizacao(self, build_atual, build_nova, url_release):
+
+        self.lbl_status.configure(text="")
+
+        if build_nova > build_atual:
+
+            abrir = messagebox.askyesno(
+                "Atualização disponível",
+                f"Você está usando a build #{build_atual}.\n"
+                f"A build #{build_nova} já está disponível no GitHub.\n\n"
+                "Deseja abrir a página de download agora?"
+            )
+
+            if abrir:
+                webbrowser.open(url_release)
+
+        else:
+
+            messagebox.showinfo(
+                "Verificar Atualização",
+                f"Você já está com a versão mais recente (build #{build_atual})."
+            )
+
+    # ======================================================
+
+    def _erro_atualizacao(self, erro):
+
+        self.lbl_status.configure(text="")
+
+        messagebox.showerror(
+            "Verificar Atualização",
+            f"Não foi possível verificar atualizações agora:\n\n{erro}\n\n"
+            "Confira sua conexão com a internet."
+        )
