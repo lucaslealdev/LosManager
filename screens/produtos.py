@@ -453,7 +453,6 @@ class JanelaReceita(ctk.CTkToplevel):
         self.produto_id = produto_id
 
         self.title(f"Receita — {nome_produto}")
-        self.geometry("560x520")
         self.transient(master.winfo_toplevel())
         self.grab_set()
 
@@ -553,6 +552,17 @@ class JanelaReceita(ctk.CTkToplevel):
 
         self.carregar_ingredientes_disponiveis()
         self.carregar()
+
+        # O tamanho da janela é calculado depois de montar todos os
+        # widgets (em vez de um valor fixo chutado), porque a altura
+        # real do conteúdo varia com DPI/fonte de cada Windows — um
+        # tamanho fixo pequeno demais deixava o botão "Remover" cortado,
+        # exigindo redimensionar a janela na mão pra aparecer.
+        self.update_idletasks()
+        largura = max(self.winfo_reqwidth() + 30, 580)
+        altura = self.winfo_reqheight() + 40
+        self.geometry(f"{largura}x{altura}")
+        self.minsize(largura, altura)
 
     # ======================================================
 
