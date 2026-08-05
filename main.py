@@ -4,6 +4,7 @@ from PIL import Image
 from database.conexao import banco
 from screens.dashboard import Dashboard
 from screens.produtos import Produtos
+from screens.ingredientes import Ingredientes
 from screens.clientes import Clientes
 from screens.pedidos import Pedidos
 from screens.configuracoes import Configuracoes
@@ -81,6 +82,7 @@ class LosManager(ctk.CTk):
 
             ("dashboard", "🏠 Dashboard", self.abrir_dashboard),
             ("produtos", "🍔 Produtos", self.abrir_produtos),
+            ("ingredientes", "🧂 Ingredientes", self.abrir_ingredientes),
             ("clientes", "👥 Clientes", self.abrir_clientes),
             ("pedidos", "🛒 Pedidos", self.abrir_pedidos),
             ("caixa", "💰 Caixa", self.abrir_caixa),
@@ -206,6 +208,13 @@ class LosManager(ctk.CTk):
 
         self.limpar_area()
         Produtos(self.area)
+
+    # ==================================================
+
+    def abrir_ingredientes(self):
+
+        self.limpar_area()
+        Ingredientes(self.area)
 
     # ==================================================
 

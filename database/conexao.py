@@ -248,6 +248,81 @@ class Banco:
 
         self._criar_tabela_enderecos_cliente()
 
+        # =====================================================
+        # INGREDIENTES (estoque por insumo, ex: queijo, bacon...)
+        # =====================================================
+
+        self.cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ingredientes(
+
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            nome TEXT NOT NULL,
+
+            categoria TEXT,
+
+            unidade_medida TEXT DEFAULT 'porção',
+
+            estoque_atual REAL DEFAULT 0,
+
+            estoque_minimo REAL DEFAULT 0,
+
+            custo_unitario REAL DEFAULT 0,
+
+            ativo INTEGER DEFAULT 1
+
+        )
+        """)
+
+        # =====================================================
+        # RECEITA DO PRODUTO (quais ingredientes cada produto usa
+        # e em que quantidade, na unidade do próprio ingrediente)
+        # =====================================================
+
+        self.cursor.execute("""
+        CREATE TABLE IF NOT EXISTS receita_produto(
+
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            produto_id INTEGER NOT NULL,
+
+            ingrediente_id INTEGER NOT NULL,
+
+            quantidade REAL NOT NULL,
+
+            FOREIGN KEY(produto_id)
+            REFERENCES produtos(id),
+
+            FOREIGN KEY(ingrediente_id)
+            REFERENCES ingredientes(id)
+
+        )
+        """)
+
+        # =====================================================
+        # MOVIMENTOS DE INGREDIENTE (histórico: saída por venda,
+        # devolução por cancelamento, ajuste manual de estoque)
+        # =====================================================
+
+        self.cursor.execute("""
+        CREATE TABLE IF NOT EXISTS movimentos_ingrediente(
+
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+            ingrediente_id INTEGER,
+
+            tipo TEXT,
+            quantidade REAL,
+            pedido_id INTEGER,
+            data TEXT,
+            hora TEXT,
+
+            FOREIGN KEY(ingrediente_id)
+            REFERENCES ingredientes(id)
+
+        )
+        """)
+
         self.conexao.commit()
 
     # =========================================================

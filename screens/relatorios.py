@@ -5,6 +5,7 @@ from datetime import datetime
 from database.conexao import banco
 from utils import config
 from utils import busca
+from utils import tema
 
 
 class Relatorios(ctk.CTkFrame):
@@ -66,7 +67,7 @@ class Relatorios(ctk.CTkFrame):
 
         self.tabela = ttk.Treeview(
             self.scroll,
-            columns=("numero", "data", "hora", "cliente", "total", "pagamento"),
+            columns=("id", "numero", "data", "hora", "cliente", "total", "pagamento", "status"),
             show="headings",
             height=15
         )
@@ -75,16 +76,46 @@ class Relatorios(ctk.CTkFrame):
             ("numero", "Nº", 70, "center"),
             ("data", "Data", 90, "center"),
             ("hora", "Hora", 70, "center"),
-            ("cliente", "Cliente", 280, "w"),
+            ("cliente", "Cliente", 260, "w"),
             ("total", "Total", 100, "e"),
             ("pagamento", "Pagamento", 110, "center"),
+            ("status", "Status", 100, "center"),
         ]
 
         for chave, texto, largura, ancora in colunas:
             self.tabela.heading(chave, text=texto)
             self.tabela.column(chave, width=largura, anchor=ancora)
 
+        # Coluna "id" fica fora de displaycolumns: guarda o id do pedido
+        # sem mostrar na tela (é só pra saber o que cancelar depois).
+        self.tabela["displaycolumns"] = [chave for chave, *_ in colunas]
+
+        self.tabela.tag_configure("cancelado", foreground="gray")
+
         self.tabela.pack(fill="x", pady=10)
+
+        # ---------------- Ações sobre o pedido selecionado ----------------
+
+        acoes_pedido = ctk.CTkFrame(self.scroll, fg_color="transparent")
+        acoes_pedido.pack(fill="x", pady=(0, 10))
+
+        ctk.CTkButton(
+            acoes_pedido,
+            text="🚫 Cancelar Pedido Selecionado",
+            fg_color=tema.COR_VERMELHO,
+            hover_color="#B93601",
+            width=240,
+            command=self.cancelar_pedido
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            acoes_pedido,
+            text="Cancelar devolve automaticamente ao estoque os produtos e "
+                 "ingredientes usados no pedido. O pedido continua no "
+                 "histórico, só marcado como \"Cancelado\".",
+            font=("Arial", 12),
+            text_color="gray"
+        ).pack(side="left", padx=15)
 
         # ---------------- Zona de perigo: zerar relatórios ----------------
 
@@ -183,6 +214,9 @@ class Relatorios(ctk.CTkFrame):
                 banco.executar(
                     "DELETE FROM itens_pedido WHERE pedido_id=?", (pedido_id,)
                 )
+                banco.executar(
+                    "DELETE FROM movimentos_ingrediente WHERE pedido_id=?", (pedido_id,)
+                )
 
             banco.executar("DELETE FROM pedidos WHERE data=?", (hoje,))
 
@@ -191,6 +225,7 @@ class Relatorios(ctk.CTkFrame):
         else:
 
             banco.executar("DELETE FROM itens_pedido")
+            banco.executar("DELETE FROM movimentos_ingrediente")
             banco.executar("DELETE FROM pedidos")
 
             mensagem = "Todo o histórico de pedidos foi zerado."
@@ -201,13 +236,119 @@ class Relatorios(ctk.CTkFrame):
         self.aplicar_filtro()
 
     # ======================================================
+    # CANCELAR PEDIDO (devolve estoque de produto + ingredientes)
+    # ======================================================
+
+    def cancelar_pedido(self):
+
+        selecionado = self.tabela.selection()
+
+        if not selecionado:
+            messagebox.showwarning(
+                "Relatórios",
+                "Selecione um pedido na lista para cancelar."
+            )
+            return
+
+        valores = self.tabela.item(selecionado[0], "values")
+        pedido_id, numero, status_atual = valores[0], valores[1], valores[7]
+
+        if status_atual == "Cancelado":
+            messagebox.showinfo("Relatórios", f"O pedido Nº {numero} já está cancelado.")
+            return
+
+        confirmar = messagebox.askyesno(
+            "Cancelar Pedido",
+            f"Cancelar o pedido Nº {numero}?\n\n"
+            "O estoque de produtos e de ingredientes usados nesse pedido "
+            "será devolvido automaticamente. O pedido continua no "
+            "histórico, só marcado como \"Cancelado\" — essa ação não "
+            "apaga nada."
+        )
+
+        if not confirmar:
+            return
+
+        try:
+            self.devolver_estoque_pedido(pedido_id)
+
+            banco.executar_sem_commit(
+                "UPDATE pedidos SET status='Cancelado' WHERE id=?", (pedido_id,)
+            )
+
+        except Exception as erro:
+            banco.rollback()
+            messagebox.showerror(
+                "Erro ao cancelar pedido",
+                f"Não foi possível cancelar o pedido:\n\n{erro}"
+            )
+            return
+
+        banco.commit()
+
+        messagebox.showinfo(
+            "Relatórios",
+            f"Pedido Nº {numero} cancelado. Estoque devolvido."
+        )
+
+        self.carregar_pedidos()
+        self.aplicar_filtro()
+
+    # ======================================================
+
+    def devolver_estoque_pedido(self, pedido_id):
+        """Devolve ao estoque cada produto vendido no pedido e, se o
+        produto tiver receita, também cada ingrediente usado — o
+        inverso exato do abatimento feito em `Pedidos.gravar_pedido()`.
+        Roda dentro da transação manual de `cancelar_pedido`."""
+
+        agora = datetime.now()
+        data_str = agora.strftime("%d/%m/%Y")
+        hora_str = agora.strftime("%H:%M")
+
+        itens = banco.buscar(
+            "SELECT produto_id, quantidade FROM itens_pedido WHERE pedido_id=?",
+            (pedido_id,)
+        )
+
+        for produto_id, quantidade in itens:
+
+            banco.executar_sem_commit(
+                "UPDATE produtos SET estoque = estoque + ? WHERE id=?",
+                (quantidade, produto_id)
+            )
+
+            receita = banco.buscar(
+                "SELECT ingrediente_id, quantidade FROM receita_produto WHERE produto_id=?",
+                (produto_id,)
+            )
+
+            for ingrediente_id, quantidade_unitaria in receita:
+
+                quantidade_total = quantidade_unitaria * quantidade
+
+                banco.executar_sem_commit(
+                    "UPDATE ingredientes SET estoque_atual = estoque_atual + ? WHERE id=?",
+                    (quantidade_total, ingrediente_id)
+                )
+
+                banco.executar_sem_commit(
+                    """
+                    INSERT INTO movimentos_ingrediente
+                        (ingrediente_id, tipo, quantidade, pedido_id, data, hora)
+                    VALUES (?, 'devolucao', ?, ?, ?, ?)
+                    """,
+                    (ingrediente_id, quantidade_total, pedido_id, data_str, hora_str)
+                )
+
+    # ======================================================
 
     def carregar_pedidos(self):
 
         self.todos_pedidos = banco.buscar(
             """
-            SELECT p.numero, p.data, p.hora,
-                   COALESCE(c.nome, 'Cliente Balcão'), p.total, p.pagamento
+            SELECT p.id, p.numero, p.data, p.hora,
+                   COALESCE(c.nome, 'Cliente Balcão'), p.total, p.pagamento, p.status
             FROM pedidos p
             LEFT JOIN clientes c ON c.id = p.cliente_id
             ORDER BY p.id DESC
@@ -224,7 +365,7 @@ class Relatorios(ctk.CTkFrame):
 
         filtrados = []
 
-        for numero, data, hora, cliente, total, pagamento in self.todos_pedidos:
+        for pedido_id, numero, data, hora, cliente, total, pagamento, status in self.todos_pedidos:
 
             try:
                 data_dt = datetime.strptime(data, "%d/%m/%Y")
@@ -246,21 +387,29 @@ class Relatorios(ctk.CTkFrame):
                 if not busca.contem(termo, cliente) and termo not in str(numero):
                     continue
 
-            filtrados.append((numero, data, hora, cliente, total, pagamento))
+            filtrados.append((pedido_id, numero, data, hora, cliente, total, pagamento, status))
 
         for linha in self.tabela.get_children():
             self.tabela.delete(linha)
 
-        for numero, data, hora, cliente, total, pagamento in filtrados:
+        for pedido_id, numero, data, hora, cliente, total, pagamento, status in filtrados:
+
+            cancelado = status == "Cancelado"
+
             self.tabela.insert(
                 "", "end",
                 values=(
-                    f"{numero:04d}", data, hora, cliente,
-                    f"R$ {total:.2f}", pagamento
-                )
+                    pedido_id, f"{numero:04d}", data, hora, cliente,
+                    f"R$ {total:.2f}", pagamento, status or "Finalizado"
+                ),
+                tags=("cancelado",) if cancelado else ()
             )
 
-        self.atualizar_cards(filtrados)
+        # Cards de resumo só contam pedidos não cancelados, senão o
+        # faturamento ficaria inflado com vendas que foram desfeitas.
+        validos = [p for p in filtrados if p[7] != "Cancelado"]
+
+        self.atualizar_cards(validos)
 
     # ======================================================
 
@@ -269,7 +418,7 @@ class Relatorios(ctk.CTkFrame):
         for widget in self.cards_frame.winfo_children():
             widget.destroy()
 
-        total_vendas = sum(p[4] for p in filtrados)
+        total_vendas = sum(p[5] for p in filtrados)
         quantidade = len(filtrados)
         ticket_medio = total_vendas / quantidade if quantidade else 0.0
 

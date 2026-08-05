@@ -98,6 +98,15 @@ def obter_largura_papel():
         return 32
 
 
+def bloquear_venda_sem_estoque_ingrediente():
+    """Se True, o pedido não deixa adicionar um item quando algum
+    ingrediente da receita não tem estoque suficiente. Se False
+    (padrão), só avisa e deixa continuar — igual ao aviso de estoque
+    de produto que já existe."""
+
+    return obter("bloquear_venda_sem_estoque_ingrediente", "0") == "1"
+
+
 # =================================================================
 # CAMINHOS DE ARQUIVOS (funciona rodando .py OU já como .exe)
 # =================================================================

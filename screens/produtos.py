@@ -101,6 +101,14 @@ class Produtos(ctk.CTkFrame):
 
         ctk.CTkButton(
             botoes_form,
+            text="🧂 Receita do Produto Selecionado",
+            fg_color=tema.COR_TEXTO_CLARO,
+            hover_color=tema.COR_TEXTO,
+            command=self.abrir_receita
+        ).pack(side="left", padx=10)
+
+        ctk.CTkButton(
+            botoes_form,
             text="🗑 Excluir Produto Selecionado",
             fg_color=tema.COR_VERMELHO,
             hover_color="#B93601",
@@ -246,6 +254,25 @@ class Produtos(ctk.CTkFrame):
         self.btn_cancelar.pack(side="left", padx=10)
 
         self.nome.focus()
+
+    # ======================================================
+
+    def abrir_receita(self):
+
+        selecionado = self.tabela.selection()
+
+        if not selecionado:
+            messagebox.showwarning(
+                "Produtos",
+                "Selecione um produto na lista para editar a receita."
+            )
+            return
+
+        valores = self.tabela.item(selecionado[0], "values")
+        produto_id = valores[0]
+        nome = valores[1]
+
+        JanelaReceita(self, produto_id, nome)
 
     # ======================================================
 
@@ -408,3 +435,204 @@ class Produtos(ctk.CTkFrame):
         messagebox.showinfo("Produtos", f"\"{nome}\" foi {acao}.")
 
         self.carregar()
+
+
+# ==========================================================
+# JANELA DE RECEITA (ficha técnica) DE UM PRODUTO
+# ==========================================================
+
+class JanelaReceita(ctk.CTkToplevel):
+    """Lista/edita os ingredientes que compõem um produto (ex: Pastel
+    Bacon com Queijo = 1 porção de Bacon + 1 porção de Queijo). Cada
+    ingrediente da receita fica em `receita_produto`, na unidade de
+    medida já cadastrada no próprio ingrediente."""
+
+    def __init__(self, master, produto_id, nome_produto):
+        super().__init__(master)
+
+        self.produto_id = produto_id
+
+        self.title(f"Receita — {nome_produto}")
+        self.geometry("560x520")
+        self.transient(master.winfo_toplevel())
+        self.grab_set()
+
+        ctk.CTkLabel(
+            self,
+            text=f"Receita de \"{nome_produto}\"",
+            font=("Arial", 20, "bold")
+        ).pack(pady=(15, 5))
+
+        ctk.CTkLabel(
+            self,
+            text="Quando esse produto for vendido, cada ingrediente abaixo é\n"
+                 "descontado do estoque na quantidade informada.",
+            font=("Arial", 12),
+            text_color="gray",
+            justify="center"
+        ).pack(pady=(0, 10))
+
+        formulario = ctk.CTkFrame(self)
+        formulario.pack(fill="x", padx=15)
+
+        ctk.CTkLabel(formulario, text="Ingrediente").grid(row=0, column=0, padx=10, pady=10, sticky="w")
+
+        self.combo_ingrediente = ctk.CTkComboBox(formulario, width=260, values=[])
+        self.combo_ingrediente.grid(row=0, column=1, padx=10)
+
+        ctk.CTkLabel(formulario, text="Qtd.").grid(row=0, column=2, padx=(15, 5), pady=10)
+
+        self.quantidade = ctk.CTkEntry(formulario, width=80)
+        self.quantidade.grid(row=0, column=3, padx=5)
+
+        ctk.CTkButton(
+            self,
+            text="Adicionar à Receita",
+            fg_color=tema.COR_LARANJA,
+            hover_color=tema.COR_LARANJA_ESCURO,
+            command=self.adicionar
+        ).pack(pady=(5, 10))
+
+        self.tabela = ttk.Treeview(
+            self,
+            columns=("id", "ingrediente", "quantidade", "unidade"),
+            show="headings",
+            height=10
+        )
+
+        self.tabela.heading("ingrediente", text="Ingrediente")
+        self.tabela.heading("quantidade", text="Quantidade")
+        self.tabela.heading("unidade", text="Unidade")
+
+        # Coluna "id" fica fora de displaycolumns: guarda o id da linha
+        # sem mostrar na tela (é só pra saber o que remover depois).
+        self.tabela["displaycolumns"] = ("ingrediente", "quantidade", "unidade")
+
+        self.tabela.column("ingrediente", width=260)
+        self.tabela.column("quantidade", width=110, anchor="e")
+        self.tabela.column("unidade", width=100, anchor="center")
+
+        self.tabela.pack(fill="both", expand=True, padx=15, pady=(0, 10))
+
+        ctk.CTkButton(
+            self,
+            text="🗑 Remover Ingrediente Selecionado",
+            fg_color=tema.COR_VERMELHO,
+            hover_color="#B93601",
+            command=self.remover
+        ).pack(pady=(0, 15))
+
+        self.carregar_ingredientes_disponiveis()
+        self.carregar()
+
+    # ======================================================
+
+    def carregar_ingredientes_disponiveis(self):
+
+        self.ingredientes_cache = banco.buscar(
+            "SELECT id, nome, unidade_medida FROM ingredientes WHERE ativo=1 ORDER BY nome"
+        )
+
+        nomes = [i[1] for i in self.ingredientes_cache]
+
+        self.combo_ingrediente.configure(values=nomes)
+
+        if nomes:
+            self.combo_ingrediente.set(nomes[0])
+        else:
+            self.combo_ingrediente.set("")
+            messagebox.showinfo(
+                "Receita",
+                "Nenhum ingrediente cadastrado ainda. Cadastre ingredientes "
+                "na aba \"Ingredientes\" antes de montar a receita."
+            )
+
+    # ======================================================
+
+    def adicionar(self):
+
+        nome_escolhido = self.combo_ingrediente.get()
+
+        ingrediente = next(
+            (i for i in self.ingredientes_cache if i[1] == nome_escolhido),
+            None
+        )
+
+        if ingrediente is None:
+            messagebox.showwarning("Receita", "Selecione um ingrediente válido.")
+            return
+
+        try:
+            quantidade = float(self.quantidade.get().strip().replace(",", "."))
+        except ValueError:
+            messagebox.showwarning("Receita", "Quantidade inválida. Use números, ex: 1 ou 0,5")
+            return
+
+        if quantidade <= 0:
+            messagebox.showwarning("Receita", "Quantidade deve ser maior que zero.")
+            return
+
+        ingrediente_id = ingrediente[0]
+
+        ja_existe = banco.buscar_um(
+            "SELECT id FROM receita_produto WHERE produto_id=? AND ingrediente_id=?",
+            (self.produto_id, ingrediente_id)
+        )
+
+        if ja_existe:
+            banco.executar(
+                "UPDATE receita_produto SET quantidade=? WHERE id=?",
+                (quantidade, ja_existe[0])
+            )
+        else:
+            banco.executar(
+                """
+                INSERT INTO receita_produto (produto_id, ingrediente_id, quantidade)
+                VALUES (?, ?, ?)
+                """,
+                (self.produto_id, ingrediente_id, quantidade)
+            )
+
+        self.quantidade.delete(0, "end")
+        self.carregar()
+
+    # ======================================================
+
+    def remover(self):
+
+        selecionado = self.tabela.selection()
+
+        if not selecionado:
+            messagebox.showwarning("Receita", "Selecione um ingrediente da receita para remover.")
+            return
+
+        valores = self.tabela.item(selecionado[0], "values")
+        receita_id = valores[0]
+
+        banco.executar("DELETE FROM receita_produto WHERE id=?", (receita_id,))
+
+        self.carregar()
+
+    # ======================================================
+
+    def carregar(self):
+
+        for item in self.tabela.get_children():
+            self.tabela.delete(item)
+
+        linhas = banco.buscar(
+            """
+            SELECT r.id, i.nome, r.quantidade, i.unidade_medida
+            FROM receita_produto r
+            JOIN ingredientes i ON i.id = r.ingrediente_id
+            WHERE r.produto_id=?
+            ORDER BY i.nome
+            """,
+            (self.produto_id,)
+        )
+
+        for receita_id, nome_ingrediente, quantidade, unidade in linhas:
+            self.tabela.insert(
+                "", "end",
+                values=(receita_id, nome_ingrediente, f"{quantidade:g}", unidade)
+            )

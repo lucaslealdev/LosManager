@@ -13,6 +13,7 @@ class Dashboard(ctk.CTkFrame):
 
         self.montar_cabecalho()
         self.montar_cards()
+        self.montar_alerta_estoque()
 
     # ======================================================
     # CABEÇALHO
@@ -135,6 +136,44 @@ class Dashboard(ctk.CTkFrame):
             font=("Arial", 26, "bold"),
             anchor="w"
         ).pack(fill="x")
+
+    # ======================================================
+    # ALERTA DE ESTOQUE BAIXO (ingredientes)
+    # ======================================================
+
+    def montar_alerta_estoque(self):
+
+        ingredientes_baixos = banco.buscar(
+            """
+            SELECT nome, estoque_atual, estoque_minimo
+            FROM ingredientes
+            WHERE ativo=1 AND estoque_atual <= estoque_minimo
+            ORDER BY nome
+            """
+        )
+
+        if not ingredientes_baixos:
+            return
+
+        nomes = ", ".join(nome for nome, _, _ in ingredientes_baixos)
+
+        alerta = ctk.CTkFrame(
+            self,
+            corner_radius=14,
+            fg_color="#fef2f2",
+            border_width=1,
+            border_color="#fca5a5"
+        )
+        alerta.pack(fill="x", padx=14, pady=(0, 14))
+
+        ctk.CTkLabel(
+            alerta,
+            text=f"⚠️ Estoque baixo de {len(ingredientes_baixos)} ingrediente(s): {nomes}",
+            font=("Arial", 14, "bold"),
+            text_color="#b91c1c",
+            wraplength=900,
+            justify="left"
+        ).pack(padx=18, pady=12, anchor="w")
 
     # ======================================================
     # BANCO: números reais do sistema

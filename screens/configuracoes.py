@@ -97,6 +97,39 @@ class Configuracoes(ctk.CTkFrame):
         self.papel.grid(row=2, column=1, padx=15, pady=(5, 15), sticky="w")
 
         # =========================================================
+        # ESTOQUE DE INGREDIENTES
+        # =========================================================
+
+        bloco_ingredientes = ctk.CTkFrame(self)
+        bloco_ingredientes.pack(fill="x", padx=10, pady=10)
+
+        ctk.CTkLabel(
+            bloco_ingredientes,
+            text="Estoque de Ingredientes",
+            font=("Arial", 16, "bold")
+        ).grid(row=0, column=0, columnspan=2, sticky="w", padx=15, pady=(15, 10))
+
+        self.bloquear_estoque_ingrediente = ctk.CTkSwitch(
+            bloco_ingredientes,
+            text="Bloquear a venda quando faltar ingrediente no estoque",
+            onvalue="1",
+            offvalue="0"
+        )
+        self.bloquear_estoque_ingrediente.grid(
+            row=1, column=0, columnspan=2, sticky="w", padx=15, pady=(0, 5)
+        )
+
+        ctk.CTkLabel(
+            bloco_ingredientes,
+            text="Desligado (padrão): o sistema só avisa que falta ingrediente e\n"
+                 "deixa continuar a venda mesmo assim, igual já acontece hoje\n"
+                 "com o estoque de produto.",
+            font=("Arial", 12),
+            text_color="gray",
+            justify="left"
+        ).grid(row=2, column=0, columnspan=2, sticky="w", padx=15, pady=(0, 15))
+
+        # =========================================================
         # SEGURANÇA
         # =========================================================
 
@@ -206,6 +239,11 @@ class Configuracoes(ctk.CTkFrame):
         largura_salva = config.obter_largura_papel()
         self.papel.set("80mm (48 col.)" if largura_salva == 48 else "58mm (32 col.)")
 
+        if config.bloquear_venda_sem_estoque_ingrediente():
+            self.bloquear_estoque_ingrediente.select()
+        else:
+            self.bloquear_estoque_ingrediente.deselect()
+
         self.senha_reset.delete(0, "end")
         self.senha_reset.insert(0, config.obter("senha_reset"))
 
@@ -255,6 +293,7 @@ class Configuracoes(ctk.CTkFrame):
         config.definir("senha_reset", self.senha_reset.get().strip())
         config.definir("impressora_nome", self.combo_impressoras.get().strip())
         config.definir("impressora_largura", str(largura))
+        config.definir("bloquear_venda_sem_estoque_ingrediente", self.bloquear_estoque_ingrediente.get())
 
         self.lbl_status.configure(
             text="✅ Configurações salvas com sucesso!",

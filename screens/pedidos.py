@@ -362,6 +362,79 @@ class Pedidos(ctk.CTkFrame):
 
     # ======================================================
 
+    def calcular_consumo_ingredientes(self, itens):
+        """Soma quanto de cada ingrediente essa lista de itens (dicts
+        com produto_id/qtd) vai consumir, olhando a receita de cada
+        produto. Retorna {ingrediente_id: quantidade_total}."""
+
+        consumo = {}
+
+        for item in itens:
+
+            receita = banco.buscar(
+                "SELECT ingrediente_id, quantidade FROM receita_produto WHERE produto_id=?",
+                (item["produto_id"],)
+            )
+
+            for ingrediente_id, quantidade in receita:
+                consumo[ingrediente_id] = consumo.get(ingrediente_id, 0) + quantidade * item["qtd"]
+
+        return consumo
+
+    # ======================================================
+
+    def verificar_estoque_ingredientes(self, itens, nome_produto):
+        """Confere se o estoque de ingredientes aguenta os `itens`
+        simulados. Se faltar algo: bloqueia (se configurado) ou avisa
+        e deixa o usuário decidir se continua. Retorna True se pode
+        seguir com a adição do item, False se deve cancelar."""
+
+        consumo = self.calcular_consumo_ingredientes(itens)
+
+        if not consumo:
+            return True
+
+        placeholders = ",".join("?" * len(consumo))
+
+        ingredientes_info = banco.buscar(
+            f"SELECT id, nome, estoque_atual FROM ingredientes WHERE id IN ({placeholders})",
+            tuple(consumo.keys())
+        )
+
+        faltando = []
+
+        for ingrediente_id, nome_ingrediente, estoque_atual in ingredientes_info:
+
+            necessario = consumo[ingrediente_id]
+
+            if necessario > estoque_atual:
+                faltando.append(
+                    f"{nome_ingrediente} (precisa de {necessario:g}, tem {estoque_atual:g})"
+                )
+
+        if not faltando:
+            return True
+
+        mensagem = (
+            f"Para vender \"{nome_produto}\" falta estoque de ingrediente(s):\n\n"
+            + "\n".join(faltando)
+        )
+
+        if config.bloquear_venda_sem_estoque_ingrediente():
+            messagebox.showerror(
+                "Estoque de ingredientes insuficiente",
+                mensagem + "\n\nA venda está bloqueada nas Configurações "
+                "enquanto o estoque não for reposto."
+            )
+            return False
+
+        return messagebox.askyesno(
+            "Estoque de ingredientes insuficiente",
+            mensagem + "\n\nDeseja adicionar mesmo assim?"
+        )
+
+    # ======================================================
+
     def adicionar_item(self):
 
         if self.produto_selecionado is None:
@@ -403,6 +476,14 @@ class Pedidos(ctk.CTkFrame):
 
             if not continuar:
                 return
+
+        # Confere também o estoque dos ingredientes da receita (se o
+        # produto tiver uma), somando o que já está no carrinho — um
+        # ingrediente pode ser usado por vários produtos diferentes.
+        itens_simulados = self.itens + [{"produto_id": produto["id"], "qtd": qtd}]
+
+        if not self.verificar_estoque_ingredientes(itens_simulados, produto["nome"]):
+            return
 
         subtotal = qtd * produto["preco"]
 
@@ -563,6 +644,36 @@ class Pedidos(ctk.CTkFrame):
                     """,
                     (item["qtd"], item["produto_id"])
                 )
+
+                # Desconta também os ingredientes da receita desse produto
+                # (ex: vender 1 Pastel Bacon com Queijo abate 1 porção de
+                # bacon + 1 de queijo), registrando o histórico de cada saída.
+                receita = banco.buscar(
+                    "SELECT ingrediente_id, quantidade FROM receita_produto WHERE produto_id=?",
+                    (item["produto_id"],)
+                )
+
+                for ingrediente_id, quantidade_unitaria in receita:
+
+                    quantidade_total = quantidade_unitaria * item["qtd"]
+
+                    banco.executar_sem_commit(
+                        """
+                        UPDATE ingredientes
+                        SET estoque_atual = MAX(0, estoque_atual - ?)
+                        WHERE id = ?
+                        """,
+                        (quantidade_total, ingrediente_id)
+                    )
+
+                    banco.executar_sem_commit(
+                        """
+                        INSERT INTO movimentos_ingrediente
+                            (ingrediente_id, tipo, quantidade, pedido_id, data, hora)
+                        VALUES (?, 'saida', ?, ?, ?, ?)
+                        """,
+                        (ingrediente_id, quantidade_total, pedido_id, data_str, hora_str)
+                    )
 
         except Exception:
             banco.rollback()
