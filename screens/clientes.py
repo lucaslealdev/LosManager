@@ -16,14 +16,20 @@ class Clientes(ctk.CTkFrame):
 
         self.pack(fill="both", expand=True, padx=20, pady=20)
 
+        # Frame com rolagem: em telas menores o conteúdo não cabia
+        # inteiro na altura da janela e não tinha como rolar até o
+        # resto dos botões/tabela.
+        self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.scroll.pack(fill="both", expand=True)
+
         titulo = ctk.CTkLabel(
-            self,
+            self.scroll,
             text="Cadastro de Clientes",
             font=("Arial", 30, "bold")
         )
         titulo.pack(pady=(10, 20))
 
-        formulario = ctk.CTkFrame(self)
+        formulario = ctk.CTkFrame(self.scroll)
         formulario.pack(fill="x", padx=20)
 
         # Nome
@@ -84,7 +90,7 @@ class Clientes(ctk.CTkFrame):
         self.cliente_id_editando = None
 
         # Busca
-        busca_frame = ctk.CTkFrame(self, fg_color="transparent")
+        busca_frame = ctk.CTkFrame(self.scroll, fg_color="transparent")
         busca_frame.pack(fill="x", padx=20, pady=(10, 0))
 
         ctk.CTkLabel(
@@ -120,7 +126,7 @@ class Clientes(ctk.CTkFrame):
 
         # Tabela
         self.tabela = ttk.Treeview(
-            self,
+            self.scroll,
             columns=("id", "nome", "telefone", "endereco", "cep"),
             show="headings",
             height=15
@@ -318,21 +324,27 @@ class JanelaEnderecos(ctk.CTkToplevel):
         self.endereco_id_editando = None
 
         self.title(f"Endereços de {nome_cliente}")
-        self.geometry("700x600")
 
         # Modal: trava a janela principal enquanto essa estiver aberta
-        self.transient(master)
+        self.transient(master.winfo_toplevel())
         self.grab_set()
 
         self.protocol("WM_DELETE_WINDOW", self.fechar)
 
+        # Frame com rolagem: em telas pequenas (notebooks antigos) o
+        # conteúdo dessa janela pode não caber inteiro na altura
+        # disponível da tela — sem isso, os botões de baixo ficavam
+        # inacessíveis.
+        self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.scroll.pack(fill="both", expand=True)
+
         ctk.CTkLabel(
-            self,
+            self.scroll,
             text=f"📍 Endereços — {nome_cliente}",
             font=("Arial", 20, "bold")
         ).pack(pady=(15, 10))
 
-        formulario = ctk.CTkFrame(self)
+        formulario = ctk.CTkFrame(self.scroll)
         formulario.pack(fill="x", padx=20)
 
         # Apelido
@@ -442,7 +454,7 @@ class JanelaEnderecos(ctk.CTkToplevel):
 
         # Tabela de endereços já cadastrados
         self.tabela = ttk.Treeview(
-            self,
+            self.scroll,
             columns=("id", "apelido", "endereco", "cep", "principal"),
             show="headings",
             height=8
@@ -464,7 +476,7 @@ class JanelaEnderecos(ctk.CTkToplevel):
 
         self.tabela.bind("<Double-1>", self.editar_selecionado)
 
-        acoes = ctk.CTkFrame(self, fg_color="transparent")
+        acoes = ctk.CTkFrame(self.scroll, fg_color="transparent")
         acoes.pack(fill="x", padx=20, pady=(0, 15))
 
         ctk.CTkButton(
@@ -493,6 +505,34 @@ class JanelaEnderecos(ctk.CTkToplevel):
         ).pack(side="right")
 
         self.carregar()
+
+        # O CTkToplevel do customtkinter ignora um geometry() chamado
+        # direto no __init__ (faz uma dança interna de cor da barra de
+        # título no Windows que reseta o tamanho logo em seguida) — um
+        # pequeno atraso deixa isso assentar antes de aplicar o
+        # tamanho de verdade.
+        self.after(60, self._ajustar_tamanho)
+
+    # ======================================================
+
+    def _ajustar_tamanho(self):
+        """Calcula o tamanho pelo conteúdo real (em vez de um valor
+        fixo chutado), limitado ao tamanho da tela — em telas pequenas
+        o conteúdo continua acessível rolando dentro do self.scroll."""
+
+        self.update_idletasks()
+
+        # max() aqui garante que o teto nunca fique menor que o piso
+        # mínimo usável, mesmo se winfo_screenwidth/height vier com um
+        # valor inesperadamente pequeno (evita uma janela minúscula).
+        largura_maxima = max(int(self.winfo_screenwidth() * 0.9), 600)
+        altura_maxima = max(int(self.winfo_screenheight() * 0.85), 500)
+
+        largura = min(max(self.winfo_reqwidth() + 30, 600), largura_maxima)
+        altura = min(max(self.winfo_reqheight() + 40, 500), altura_maxima)
+
+        self.geometry(f"{largura}x{altura}")
+        self.minsize(min(600, largura_maxima), min(400, altura_maxima))
 
     # ======================================================
 

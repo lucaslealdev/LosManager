@@ -12,14 +12,20 @@ class Ingredientes(ctk.CTkFrame):
 
         self.pack(fill="both", expand=True, padx=20, pady=20)
 
+        # Frame com rolagem: em telas menores o conteúdo não cabia
+        # inteiro na altura da janela e não tinha como rolar até o
+        # resto dos botões/tabela.
+        self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.scroll.pack(fill="both", expand=True)
+
         titulo = ctk.CTkLabel(
-            self,
+            self.scroll,
             text="Ingredientes (Estoque de Insumos)",
             font=("Arial", 30, "bold")
         )
         titulo.pack(pady=(10, 20))
 
-        filtro_frame = ctk.CTkFrame(self, fg_color="transparent")
+        filtro_frame = ctk.CTkFrame(self.scroll, fg_color="transparent")
         filtro_frame.pack(fill="x", padx=20, pady=(0, 15))
 
         ctk.CTkLabel(
@@ -42,7 +48,7 @@ class Ingredientes(ctk.CTkFrame):
             command=self.limpar_filtro
         ).pack(side="left", padx=10)
 
-        formulario = ctk.CTkFrame(self)
+        formulario = ctk.CTkFrame(self.scroll)
         formulario.pack(fill="x", padx=20)
 
         ctk.CTkLabel(formulario, text="Nome").grid(row=0, column=0, padx=10, pady=10, sticky="w")
@@ -114,7 +120,7 @@ class Ingredientes(ctk.CTkFrame):
         self.ingrediente_id_editando = None
 
         dica = ctk.CTkLabel(
-            self,
+            self.scroll,
             text="Dica: linhas em vermelho estão no estoque mínimo ou abaixo dele. "
                  "O estoque desconta sozinho quando um produto que usa esse "
                  "ingrediente na receita é vendido (aba Produtos → Receita).",
@@ -124,7 +130,7 @@ class Ingredientes(ctk.CTkFrame):
         dica.pack(anchor="w", padx=20, pady=(0, 5))
 
         self.tabela = ttk.Treeview(
-            self,
+            self.scroll,
             columns=("id", "nome", "categoria", "unidade", "estoque_atual", "estoque_minimo", "custo"),
             show="headings",
             height=15

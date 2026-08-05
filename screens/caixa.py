@@ -29,8 +29,16 @@ class Caixa(ctk.CTkFrame):
 
         self.limpar()
 
+        # Frame com rolagem: em telas menores (notebooks antigos) o
+        # conteúdo não cabia inteiro na altura da janela e não tinha
+        # como rolar até os botões/movimentações de baixo. Recriado
+        # aqui porque `limpar()` destrói tudo dentro de `self` a cada
+        # atualização da tela (abrir/fechar caixa, sangria...).
+        self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.scroll.pack(fill="both", expand=True)
+
         titulo = ctk.CTkLabel(
-            self,
+            self.scroll,
             text="Caixa",
             font=("Arial", 30, "bold")
         )
@@ -57,7 +65,7 @@ class Caixa(ctk.CTkFrame):
 
     def tela_caixa_fechado(self):
 
-        bloco = ctk.CTkFrame(self)
+        bloco = ctk.CTkFrame(self.scroll)
         bloco.pack(pady=40)
 
         ctk.CTkLabel(
@@ -136,7 +144,7 @@ class Caixa(ctk.CTkFrame):
 
         # ---------------- Cabeçalho ----------------
 
-        info = ctk.CTkFrame(self)
+        info = ctk.CTkFrame(self.scroll)
         info.pack(fill="x", pady=(0, 15))
 
         ctk.CTkLabel(
@@ -192,7 +200,7 @@ class Caixa(ctk.CTkFrame):
 
         # ---------------- Cards de resumo ----------------
 
-        cards = ctk.CTkFrame(self, fg_color="transparent")
+        cards = ctk.CTkFrame(self.scroll, fg_color="transparent")
         cards.pack(fill="x", pady=10)
 
         self.card(cards, "Pedidos Hoje", str(len(pedidos_hoje)), 0)
@@ -201,7 +209,7 @@ class Caixa(ctk.CTkFrame):
 
         # ---------------- Totais por forma de pagamento ----------------
 
-        bloco_formas = ctk.CTkFrame(self)
+        bloco_formas = ctk.CTkFrame(self.scroll)
         bloco_formas.pack(fill="x", pady=15)
 
         ctk.CTkLabel(
@@ -226,7 +234,7 @@ class Caixa(ctk.CTkFrame):
 
         # ---------------- Botões de ação ----------------
 
-        acoes = ctk.CTkFrame(self, fg_color="transparent")
+        acoes = ctk.CTkFrame(self.scroll, fg_color="transparent")
         acoes.pack(fill="x", pady=10)
 
         ctk.CTkButton(
@@ -258,7 +266,7 @@ class Caixa(ctk.CTkFrame):
 
         if movimentos:
 
-            bloco_mov = ctk.CTkFrame(self)
+            bloco_mov = ctk.CTkFrame(self.scroll)
             bloco_mov.pack(fill="both", expand=True, pady=15)
 
             ctk.CTkLabel(

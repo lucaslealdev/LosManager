@@ -11,6 +11,11 @@ class Dashboard(ctk.CTkFrame):
 
         self.pack(fill="both", expand=True, padx=30, pady=30)
 
+        # Frame com rolagem: em telas menores (notebooks antigos) o
+        # conteúdo não cabia inteiro na altura da janela.
+        self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.scroll.pack(fill="both", expand=True)
+
         self.montar_cabecalho()
         self.montar_cards()
         self.montar_alerta_estoque()
@@ -21,7 +26,7 @@ class Dashboard(ctk.CTkFrame):
 
     def montar_cabecalho(self):
 
-        cabecalho = ctk.CTkFrame(self, fg_color="transparent")
+        cabecalho = ctk.CTkFrame(self.scroll, fg_color="transparent")
         cabecalho.pack(fill="x", pady=(10, 30))
 
         ctk.CTkLabel(
@@ -50,7 +55,7 @@ class Dashboard(ctk.CTkFrame):
 
         dados = self.buscar_dados()
 
-        grade = ctk.CTkFrame(self, fg_color="transparent")
+        grade = ctk.CTkFrame(self.scroll, fg_color="transparent")
         grade.pack(expand=True)
 
         # Define os 4 cards: (ícone, cor, título, valor)
@@ -158,7 +163,7 @@ class Dashboard(ctk.CTkFrame):
         nomes = ", ".join(nome for nome, _, _ in ingredientes_baixos)
 
         alerta = ctk.CTkFrame(
-            self,
+            self.scroll,
             corner_radius=14,
             fg_color="#fef2f2",
             border_width=1,

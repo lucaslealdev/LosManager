@@ -12,14 +12,21 @@ class Produtos(ctk.CTkFrame):
 
         self.pack(fill="both", expand=True, padx=20, pady=20)
 
+        # Tudo fica dentro de um frame com rolagem: em telas menores
+        # (notebooks antigos, resolução baixa) o conteúdo não cabia
+        # inteiro na altura da janela e não tinha como rolar pra ver
+        # os botões/tabela de baixo.
+        self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.scroll.pack(fill="both", expand=True)
+
         titulo = ctk.CTkLabel(
-            self,
+            self.scroll,
             text="Cadastro de Produtos",
             font=("Arial", 30, "bold")
         )
         titulo.pack(pady=(10, 20))
 
-        filtro_frame = ctk.CTkFrame(self, fg_color="transparent")
+        filtro_frame = ctk.CTkFrame(self.scroll, fg_color="transparent")
         filtro_frame.pack(fill="x", padx=20, pady=(0, 15))
 
         ctk.CTkLabel(
@@ -51,7 +58,7 @@ class Produtos(ctk.CTkFrame):
             command=self.limpar_filtro
         ).pack(side="left", padx=10)
 
-        formulario = ctk.CTkFrame(self)
+        formulario = ctk.CTkFrame(self.scroll)
         formulario.pack(fill="x", padx=20)
 
         ctk.CTkLabel(formulario, text="Nome").grid(row=0, column=0, padx=10, pady=10, sticky="w")
@@ -118,7 +125,7 @@ class Produtos(ctk.CTkFrame):
         self.produto_id_editando = None
 
         dica = ctk.CTkLabel(
-            self,
+            self.scroll,
             text="Dica: selecione um produto na lista e use os botões acima "
                  "para editar ou excluir. Dê dois cliques numa linha "
                  "para ativar/desativar o produto sem excluir.",
@@ -128,7 +135,7 @@ class Produtos(ctk.CTkFrame):
         dica.pack(anchor="w", padx=20, pady=(0, 5))
 
         self.tabela = ttk.Treeview(
-            self,
+            self.scroll,
             columns=("id", "nome", "categoria", "preco", "estoque", "ativo"),
             show="headings",
             height=15
@@ -456,14 +463,20 @@ class JanelaReceita(ctk.CTkToplevel):
         self.transient(master.winfo_toplevel())
         self.grab_set()
 
+        # Frame com rolagem: em telas pequenas (notebooks antigos) o
+        # conteúdo dessa janela pode não caber inteiro na altura
+        # disponível da tela.
+        self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.scroll.pack(fill="both", expand=True)
+
         ctk.CTkLabel(
-            self,
+            self.scroll,
             text=f"Receita de \"{nome_produto}\"",
             font=("Arial", 20, "bold")
         ).pack(pady=(15, 5))
 
         ctk.CTkLabel(
-            self,
+            self.scroll,
             text="Quando esse produto for vendido, cada ingrediente abaixo é\n"
                  "descontado do estoque na quantidade informada.",
             font=("Arial", 12),
@@ -471,7 +484,7 @@ class JanelaReceita(ctk.CTkToplevel):
             justify="center"
         ).pack(pady=(0, 10))
 
-        formulario = ctk.CTkFrame(self)
+        formulario = ctk.CTkFrame(self.scroll)
         formulario.pack(fill="x", padx=15)
 
         ctk.CTkLabel(formulario, text="Ingrediente").grid(row=0, column=0, padx=10, pady=10, sticky="w")
@@ -484,7 +497,7 @@ class JanelaReceita(ctk.CTkToplevel):
         self.quantidade = ctk.CTkEntry(formulario, width=80)
         self.quantidade.grid(row=0, column=3, padx=5)
 
-        botoes_form = ctk.CTkFrame(self, fg_color="transparent")
+        botoes_form = ctk.CTkFrame(self.scroll, fg_color="transparent")
         botoes_form.pack(pady=(5, 10))
 
         self.btn_adicionar = ctk.CTkButton(
@@ -508,7 +521,7 @@ class JanelaReceita(ctk.CTkToplevel):
         self.receita_id_editando = None
 
         dica_edicao = ctk.CTkLabel(
-            self,
+            self.scroll,
             text="Dica: clique numa linha da lista abaixo para carregar ela nos "
                  "campos acima e corrigir a quantidade, ou use o botão vermelho "
                  "no final da janela para remover essa linha da receita.",
@@ -520,7 +533,7 @@ class JanelaReceita(ctk.CTkToplevel):
         dica_edicao.pack(pady=(0, 5))
 
         self.tabela = ttk.Treeview(
-            self,
+            self.scroll,
             columns=("id", "ingrediente", "quantidade", "unidade"),
             show="headings",
             height=10
@@ -543,7 +556,7 @@ class JanelaReceita(ctk.CTkToplevel):
         self.tabela.bind("<<TreeviewSelect>>", self.carregar_para_edicao)
 
         ctk.CTkButton(
-            self,
+            self.scroll,
             text="🗑 Remover Ingrediente Selecionado",
             fg_color=tema.COR_VERMELHO,
             hover_color="#B93601",
@@ -553,16 +566,33 @@ class JanelaReceita(ctk.CTkToplevel):
         self.carregar_ingredientes_disponiveis()
         self.carregar()
 
-        # O tamanho da janela é calculado depois de montar todos os
-        # widgets (em vez de um valor fixo chutado), porque a altura
-        # real do conteúdo varia com DPI/fonte de cada Windows — um
-        # tamanho fixo pequeno demais deixava o botão "Remover" cortado,
-        # exigindo redimensionar a janela na mão pra aparecer.
+        # O CTkToplevel do customtkinter ignora um geometry() chamado
+        # direto no __init__ (faz uma dança interna de cor da barra de
+        # título no Windows que reseta o tamanho logo em seguida) — um
+        # pequeno atraso deixa isso assentar antes de aplicar o
+        # tamanho de verdade.
+        self.after(60, self._ajustar_tamanho)
+
+    # ======================================================
+
+    def _ajustar_tamanho(self):
+        """Calcula o tamanho pelo conteúdo real (em vez de um valor
+        fixo chutado), limitado ao tamanho da tela — em telas pequenas
+        o conteúdo continua acessível rolando dentro do self.scroll."""
+
         self.update_idletasks()
-        largura = max(self.winfo_reqwidth() + 30, 580)
-        altura = self.winfo_reqheight() + 40
+
+        # max() aqui garante que o teto nunca fique menor que o piso
+        # mínimo usável, mesmo se winfo_screenwidth/height vier com um
+        # valor inesperadamente pequeno (evita uma janela minúscula).
+        largura_maxima = max(int(self.winfo_screenwidth() * 0.9), 580)
+        altura_maxima = max(int(self.winfo_screenheight() * 0.85), 450)
+
+        largura = min(max(self.winfo_reqwidth() + 30, 580), largura_maxima)
+        altura = min(max(self.winfo_reqheight() + 40, 450), altura_maxima)
+
         self.geometry(f"{largura}x{altura}")
-        self.minsize(largura, altura)
+        self.minsize(min(580, largura_maxima), min(400, altura_maxima))
 
     # ======================================================
 

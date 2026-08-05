@@ -30,14 +30,20 @@ class Pedidos(ctk.CTkFrame):
 
     def criar_interface(self):
 
+        # Frame com rolagem: em telas menores (notebooks antigos) o
+        # conteúdo não cabia inteiro na altura da janela e não tinha
+        # como rolar até o botão "Finalizar e Imprimir".
+        self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.scroll.pack(fill="both", expand=True)
+
         titulo = ctk.CTkLabel(
-            self,
+            self.scroll,
             text="Novo Pedido",
             font=("Arial", 28, "bold")
         )
         titulo.pack(pady=(5, 15))
 
-        topo = ctk.CTkFrame(self)
+        topo = ctk.CTkFrame(self.scroll)
         topo.pack(fill="x")
 
         # ---------------- Cliente ----------------
@@ -141,7 +147,7 @@ class Pedidos(ctk.CTkFrame):
         # =========================
 
         self.tabela = ttk.Treeview(
-            self,
+            self.scroll,
             columns=("produto", "qtd", "valor", "subtotal"),
             show="headings",
             height=12
@@ -161,7 +167,7 @@ class Pedidos(ctk.CTkFrame):
 
         # =========================
 
-        rodape = ctk.CTkFrame(self)
+        rodape = ctk.CTkFrame(self.scroll)
         rodape.pack(fill="x")
 
         ctk.CTkLabel(

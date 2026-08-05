@@ -18,8 +18,15 @@ class Configuracoes(ctk.CTkFrame):
 
         self.pack(fill="both", expand=True, padx=20, pady=20)
 
+        # Tudo fica dentro de um frame com rolagem: em telas menores
+        # (notebooks antigos, resolução baixa) o conteúdo desta tela
+        # não cabe inteiro na altura da janela — sem isso, os botões
+        # de baixo ficavam inacessíveis, sem nenhuma barra de rolagem.
+        self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self.scroll.pack(fill="both", expand=True)
+
         titulo = ctk.CTkLabel(
-            self,
+            self.scroll,
             text="Configurações",
             font=("Arial", 30, "bold")
         )
@@ -29,7 +36,7 @@ class Configuracoes(ctk.CTkFrame):
         # DADOS DA LOJA
         # =========================================================
 
-        bloco_loja = ctk.CTkFrame(self)
+        bloco_loja = ctk.CTkFrame(self.scroll)
         bloco_loja.pack(fill="x", padx=10, pady=10)
 
         ctk.CTkLabel(
@@ -60,7 +67,7 @@ class Configuracoes(ctk.CTkFrame):
         # IMPRESSORA
         # =========================================================
 
-        bloco_impressora = ctk.CTkFrame(self)
+        bloco_impressora = ctk.CTkFrame(self.scroll)
         bloco_impressora.pack(fill="x", padx=10, pady=10)
 
         ctk.CTkLabel(
@@ -104,7 +111,7 @@ class Configuracoes(ctk.CTkFrame):
         # ESTOQUE DE INGREDIENTES
         # =========================================================
 
-        bloco_ingredientes = ctk.CTkFrame(self)
+        bloco_ingredientes = ctk.CTkFrame(self.scroll)
         bloco_ingredientes.pack(fill="x", padx=10, pady=10)
 
         ctk.CTkLabel(
@@ -137,7 +144,7 @@ class Configuracoes(ctk.CTkFrame):
         # SEGURANÇA
         # =========================================================
 
-        bloco_seguranca = ctk.CTkFrame(self)
+        bloco_seguranca = ctk.CTkFrame(self.scroll)
         bloco_seguranca.pack(fill="x", padx=10, pady=10)
 
         ctk.CTkLabel(
@@ -167,7 +174,7 @@ class Configuracoes(ctk.CTkFrame):
         # BOTÕES DE AÇÃO
         # =========================================================
 
-        acoes = ctk.CTkFrame(self, fg_color="transparent")
+        acoes = ctk.CTkFrame(self.scroll, fg_color="transparent")
         acoes.pack(fill="x", padx=10, pady=15)
 
         ctk.CTkButton(
@@ -210,15 +217,15 @@ class Configuracoes(ctk.CTkFrame):
             command=self.verificar_atualizacao_manual
         ).pack(side="left", padx=10)
 
-        self.lbl_status = ctk.CTkLabel(self, text="", font=("Arial", 13))
+        self.lbl_status = ctk.CTkLabel(self.scroll, text="", font=("Arial", 13))
         self.lbl_status.pack(pady=(5, 0))
 
         # =========================================================
         # RODAPÉ - VERSÃO E CRÉDITOS
         # =========================================================
 
-        rodape = ctk.CTkFrame(self, fg_color="transparent")
-        rodape.pack(side="bottom", fill="x", pady=(20, 5))
+        rodape = ctk.CTkFrame(self.scroll, fg_color="transparent")
+        rodape.pack(fill="x", pady=(20, 5))
 
         ctk.CTkLabel(
             rodape,
