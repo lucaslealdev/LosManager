@@ -364,7 +364,8 @@ class Relatorios(ctk.CTkFrame):
         self.todos_pedidos = banco.buscar(
             """
             SELECT p.id, p.numero, p.data, p.hora,
-                   COALESCE(c.nome, 'Cliente Balcão'), p.total, p.pagamento, p.status
+                   COALESCE(c.nome, 'Cliente Balcão'), p.total, p.pagamento, p.status,
+                   p.subtotal, p.desconto, p.acrescimo
             FROM pedidos p
             LEFT JOIN clientes c ON c.id = p.cliente_id
             ORDER BY p.id DESC
@@ -381,7 +382,7 @@ class Relatorios(ctk.CTkFrame):
 
         filtrados = []
 
-        for pedido_id, numero, data, hora, cliente, total, pagamento, status in self.todos_pedidos:
+        for pedido_id, numero, data, hora, cliente, total, pagamento, status, subtotal, desconto, acrescimo in self.todos_pedidos:
 
             try:
                 data_dt = datetime.strptime(data, "%d/%m/%Y")
@@ -403,12 +404,15 @@ class Relatorios(ctk.CTkFrame):
                 if not busca.contem(termo, cliente) and termo not in str(numero):
                     continue
 
-            filtrados.append((pedido_id, numero, data, hora, cliente, total, pagamento, status))
+            filtrados.append((
+                pedido_id, numero, data, hora, cliente, total, pagamento, status,
+                subtotal, desconto, acrescimo
+            ))
 
         for linha in self.tabela.get_children():
             self.tabela.delete(linha)
 
-        for pedido_id, numero, data, hora, cliente, total, pagamento, status in filtrados:
+        for pedido_id, numero, data, hora, cliente, total, pagamento, status, subtotal, desconto, acrescimo in filtrados:
 
             cancelado = status == "Cancelado"
 
@@ -434,13 +438,21 @@ class Relatorios(ctk.CTkFrame):
         for widget in self.cards_frame.winfo_children():
             widget.destroy()
 
-        total_vendas = sum(p[5] for p in filtrados)
+        # Total pago pelo cliente (produtos + taxa) x venda de produtos x
+        # taxa de motoboy, separados pelo mesmo motivo do Caixa: a taxa de
+        # entrega só repassa pro motoboy, não é faturamento da pastelaria.
+        # Respeita o período selecionado (Hoje / 7 dias / Este mês / Tudo),
+        # então dá pra ver o total semanal e mensal de cada um.
+        total_geral = sum(p[5] for p in filtrados)
+        total_vendas = sum((p[8] or 0.0) - (p[9] or 0.0) for p in filtrados)
+        total_motoboy = sum(p[10] or 0.0 for p in filtrados)
         quantidade = len(filtrados)
-        ticket_medio = total_vendas / quantidade if quantidade else 0.0
+        ticket_medio = total_geral / quantidade if quantidade else 0.0
 
         self.card(self.cards_frame, "Pedidos no período", str(quantidade), 0)
-        self.card(self.cards_frame, "Faturamento no período", f"R$ {total_vendas:.2f}", 1)
-        self.card(self.cards_frame, "Ticket Médio", f"R$ {ticket_medio:.2f}", 2)
+        self.card(self.cards_frame, "Vendas no período", f"R$ {total_vendas:.2f}", 1)
+        self.card(self.cards_frame, "Taxa Motoboy no período", f"R$ {total_motoboy:.2f}", 2)
+        self.card(self.cards_frame, "Ticket Médio", f"R$ {ticket_medio:.2f}", 3)
 
     # ======================================================
 
