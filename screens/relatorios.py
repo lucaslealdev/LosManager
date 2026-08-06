@@ -6,6 +6,7 @@ from database.conexao import banco
 from utils import config
 from utils import busca
 from utils import tema
+from utils import responsivo
 
 
 class Relatorios(ctk.CTkFrame):
@@ -63,38 +64,15 @@ class Relatorios(ctk.CTkFrame):
         self.cards_frame = ctk.CTkFrame(self.scroll, fg_color="transparent")
         self.cards_frame.pack(fill="x", pady=15)
 
-        # ---------------- Tabela ----------------
-
-        self.tabela = ttk.Treeview(
-            self.scroll,
-            columns=("id", "numero", "data", "hora", "cliente", "total", "pagamento", "status"),
-            show="headings",
-            height=15
-        )
-
-        colunas = [
-            ("numero", "Nº", 70, "center"),
-            ("data", "Data", 90, "center"),
-            ("hora", "Hora", 70, "center"),
-            ("cliente", "Cliente", 260, "w"),
-            ("total", "Total", 100, "e"),
-            ("pagamento", "Pagamento", 110, "center"),
-            ("status", "Status", 100, "center"),
-        ]
-
-        for chave, texto, largura, ancora in colunas:
-            self.tabela.heading(chave, text=texto)
-            self.tabela.column(chave, width=largura, anchor=ancora)
-
-        # Coluna "id" fica fora de displaycolumns: guarda o id do pedido
-        # sem mostrar na tela (é só pra saber o que cancelar depois).
-        self.tabela["displaycolumns"] = [chave for chave, *_ in colunas]
-
-        self.tabela.tag_configure("cancelado", foreground="gray")
-
-        self.tabela.pack(fill="x", pady=10)
+        # Popula com valores zerados só pra existir de verdade (com sua
+        # altura real) antes da tabela ser dimensionada logo abaixo —
+        # os valores certos vêm de aplicar_filtro() ao final do __init__.
+        self.atualizar_cards([])
 
         # ---------------- Ações sobre o pedido selecionado ----------------
+        # Criado (e empacotado) antes da tabela só para medir a altura
+        # real que ele ocupa; a tabela é inserida visualmente ANTES
+        # dele via pack(before=...) logo abaixo.
 
         acoes_pedido = ctk.CTkFrame(self.scroll, fg_color="transparent")
         acoes_pedido.pack(fill="x", pady=(0, 10))
@@ -157,6 +135,44 @@ class Relatorios(ctk.CTkFrame):
             width=200,
             command=lambda: self.zerar_pedidos(apenas_hoje=False)
         ).pack(side="left")
+
+        # ---------------- Tabela ----------------
+        # Vem por último na construção (pra já poder medir a altura de
+        # tudo que ficou acima E abaixo dela), mas é inserida
+        # visualmente antes de "acoes_pedido" via pack(before=...).
+
+        linhas = responsivo.linhas_para_tabela(self, self.scroll, pady_tabela=10)
+
+        self.tabela = ttk.Treeview(
+            self.scroll,
+            columns=("id", "numero", "data", "hora", "cliente", "total", "pagamento", "status"),
+            show="headings",
+            height=linhas
+        )
+
+        colunas = [
+            ("numero", "Nº", 70, "center"),
+            ("data", "Data", 90, "center"),
+            ("hora", "Hora", 70, "center"),
+            ("cliente", "Cliente", 260, "w"),
+            ("total", "Total", 100, "e"),
+            ("pagamento", "Pagamento", 110, "center"),
+            ("status", "Status", 100, "center"),
+        ]
+
+        for chave, texto, largura, ancora in colunas:
+            self.tabela.heading(chave, text=texto)
+            self.tabela.column(chave, width=largura, anchor=ancora)
+
+        # Coluna "id" fica fora de displaycolumns: guarda o id do pedido
+        # sem mostrar na tela (é só pra saber o que cancelar depois).
+        self.tabela["displaycolumns"] = [chave for chave, *_ in colunas]
+
+        self.tabela.tag_configure("cancelado", foreground="gray")
+
+        self.tabela.pack(fill="x", pady=10, before=acoes_pedido)
+
+        responsivo.tornar_dinamica(self, self.scroll, lambda: self.tabela, pady_tabela=10)
 
     # ======================================================
     # ZERAR RELATÓRIOS (protegido por senha)

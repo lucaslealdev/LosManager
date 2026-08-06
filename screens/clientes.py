@@ -7,6 +7,7 @@ from tkinter import ttk, messagebox
 from database.conexao import banco
 from utils import tema
 from utils import busca
+from utils import responsivo
 
 
 class Clientes(ctk.CTkFrame):
@@ -125,11 +126,13 @@ class Clientes(ctk.CTkFrame):
         ).pack(side="left", padx=10)
 
         # Tabela
+        linhas = responsivo.linhas_para_tabela(self, self.scroll, pady_tabela=20)
+
         self.tabela = ttk.Treeview(
             self.scroll,
             columns=("id", "nome", "telefone", "endereco", "cep"),
             show="headings",
-            height=15
+            height=linhas
         )
 
         self.tabela.heading("id", text="ID")
@@ -152,6 +155,8 @@ class Clientes(ctk.CTkFrame):
         )
 
         self.tabela.bind("<Double-1>", self.editar_selecionado)
+
+        responsivo.tornar_dinamica(self, self.scroll, lambda: self.tabela, pady_tabela=20)
 
         self.carregar()
 

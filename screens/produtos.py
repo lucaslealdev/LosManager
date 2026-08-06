@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox
 from database.conexao import banco
 from utils import tema
 from utils import busca
+from utils import responsivo
 
 
 class Produtos(ctk.CTkFrame):
@@ -134,11 +135,13 @@ class Produtos(ctk.CTkFrame):
         )
         dica.pack(anchor="w", padx=20, pady=(0, 5))
 
+        linhas = responsivo.linhas_para_tabela(self, self.scroll, pady_tabela=20)
+
         self.tabela = ttk.Treeview(
             self.scroll,
             columns=("id", "nome", "categoria", "preco", "estoque", "ativo"),
             show="headings",
-            height=15
+            height=linhas
         )
 
         self.tabela.heading("id", text="ID")
@@ -158,6 +161,8 @@ class Produtos(ctk.CTkFrame):
         self.tabela.pack(fill="both", expand=True, padx=20, pady=20)
 
         self.tabela.bind("<Double-1>", self.alternar_ativo)
+
+        responsivo.tornar_dinamica(self, self.scroll, lambda: self.tabela, pady_tabela=20)
 
         self.carregar()
 

@@ -16,7 +16,7 @@ class Configuracoes(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
 
-        self.pack(fill="both", expand=True, padx=20, pady=20)
+        self.pack(fill="both", expand=True, padx=15, pady=12)
 
         # Tudo fica dentro de um frame com rolagem: em telas menores
         # (notebooks antigos, resolução baixa) o conteúdo desta tela
@@ -28,97 +28,100 @@ class Configuracoes(ctk.CTkFrame):
         titulo = ctk.CTkLabel(
             self.scroll,
             text="Configurações",
-            font=("Arial", 30, "bold")
+            font=("Arial", 24, "bold")
         )
-        titulo.pack(pady=(10, 25))
+        titulo.pack(pady=(6, 12))
 
         # =========================================================
         # DADOS DA LOJA
         # =========================================================
 
         bloco_loja = ctk.CTkFrame(self.scroll)
-        bloco_loja.pack(fill="x", padx=10, pady=10)
+        bloco_loja.pack(fill="x", padx=10, pady=6)
 
         ctk.CTkLabel(
             bloco_loja,
             text="Dados da Loja (aparecem no topo do cupom)",
-            font=("Arial", 16, "bold")
-        ).grid(row=0, column=0, columnspan=2, sticky="w", padx=15, pady=(15, 10))
+            font=("Arial", 14, "bold")
+        ).grid(row=0, column=0, columnspan=2, sticky="w", padx=15, pady=(10, 6))
 
         ctk.CTkLabel(bloco_loja, text="Nome da loja").grid(
-            row=1, column=0, sticky="w", padx=15, pady=5
+            row=1, column=0, sticky="w", padx=15, pady=4
         )
-        self.loja_nome = ctk.CTkEntry(bloco_loja, width=350)
-        self.loja_nome.grid(row=1, column=1, padx=15, pady=5, sticky="w")
+        self.loja_nome = ctk.CTkEntry(bloco_loja, width=350, height=26)
+        self.loja_nome.grid(row=1, column=1, padx=15, pady=4, sticky="w")
 
         ctk.CTkLabel(bloco_loja, text="Endereço").grid(
-            row=2, column=0, sticky="w", padx=15, pady=5
+            row=2, column=0, sticky="w", padx=15, pady=4
         )
-        self.loja_endereco = ctk.CTkEntry(bloco_loja, width=350)
-        self.loja_endereco.grid(row=2, column=1, padx=15, pady=5, sticky="w")
+        self.loja_endereco = ctk.CTkEntry(bloco_loja, width=350, height=26)
+        self.loja_endereco.grid(row=2, column=1, padx=15, pady=4, sticky="w")
 
         ctk.CTkLabel(bloco_loja, text="Telefone").grid(
-            row=3, column=0, sticky="w", padx=15, pady=(5, 15)
+            row=3, column=0, sticky="w", padx=15, pady=(4, 8)
         )
-        self.loja_telefone = ctk.CTkEntry(bloco_loja, width=350)
-        self.loja_telefone.grid(row=3, column=1, padx=15, pady=(5, 15), sticky="w")
+        self.loja_telefone = ctk.CTkEntry(bloco_loja, width=350, height=26)
+        self.loja_telefone.grid(row=3, column=1, padx=15, pady=(4, 8), sticky="w")
 
         # =========================================================
         # IMPRESSORA
         # =========================================================
 
         bloco_impressora = ctk.CTkFrame(self.scroll)
-        bloco_impressora.pack(fill="x", padx=10, pady=10)
+        bloco_impressora.pack(fill="x", padx=10, pady=6)
 
         ctk.CTkLabel(
             bloco_impressora,
             text="Impressora Térmica",
-            font=("Arial", 16, "bold")
-        ).grid(row=0, column=0, columnspan=3, sticky="w", padx=15, pady=(15, 10))
+            font=("Arial", 14, "bold")
+        ).grid(row=0, column=0, columnspan=3, sticky="w", padx=15, pady=(10, 6))
 
         ctk.CTkLabel(bloco_impressora, text="Impressora instalada").grid(
-            row=1, column=0, sticky="w", padx=15, pady=5
+            row=1, column=0, sticky="w", padx=15, pady=4
         )
 
         self.combo_impressoras = ctk.CTkComboBox(
             bloco_impressora,
             width=350,
+            height=26,
             values=["(clique em Atualizar lista)"]
         )
-        self.combo_impressoras.grid(row=1, column=1, padx=15, pady=5, sticky="w")
+        self.combo_impressoras.grid(row=1, column=1, padx=15, pady=4, sticky="w")
 
         ctk.CTkButton(
             bloco_impressora,
             text="🔄 Atualizar lista",
             width=150,
+            height=26,
             fg_color=tema.COR_LARANJA,
             hover_color=tema.COR_LARANJA_ESCURO,
             command=self.atualizar_lista_impressoras
-        ).grid(row=1, column=2, padx=15, pady=5)
+        ).grid(row=1, column=2, padx=15, pady=4)
 
         ctk.CTkLabel(bloco_impressora, text="Tamanho do papel").grid(
-            row=2, column=0, sticky="w", padx=15, pady=(5, 15)
+            row=2, column=0, sticky="w", padx=15, pady=(4, 8)
         )
 
         self.papel = ctk.CTkSegmentedButton(
             bloco_impressora,
+            height=26,
             values=["58mm (32 col.)", "80mm (48 col.)"]
         )
         self.papel.set("58mm (32 col.)")
-        self.papel.grid(row=2, column=1, padx=15, pady=(5, 15), sticky="w")
+        self.papel.grid(row=2, column=1, padx=15, pady=(4, 8), sticky="w")
 
         # =========================================================
         # ESTOQUE DE INGREDIENTES
         # =========================================================
 
         bloco_ingredientes = ctk.CTkFrame(self.scroll)
-        bloco_ingredientes.pack(fill="x", padx=10, pady=10)
+        bloco_ingredientes.pack(fill="x", padx=10, pady=6)
 
         ctk.CTkLabel(
             bloco_ingredientes,
             text="Estoque de Ingredientes",
-            font=("Arial", 16, "bold")
-        ).grid(row=0, column=0, columnspan=2, sticky="w", padx=15, pady=(15, 10))
+            font=("Arial", 14, "bold")
+        ).grid(row=0, column=0, columnspan=2, sticky="w", padx=15, pady=(10, 6))
 
         self.bloquear_estoque_ingrediente = ctk.CTkSwitch(
             bloco_ingredientes,
@@ -127,7 +130,7 @@ class Configuracoes(ctk.CTkFrame):
             offvalue="0"
         )
         self.bloquear_estoque_ingrediente.grid(
-            row=1, column=0, columnspan=2, sticky="w", padx=15, pady=(0, 5)
+            row=1, column=0, columnspan=2, sticky="w", padx=15, pady=(0, 4)
         )
 
         ctk.CTkLabel(
@@ -135,53 +138,53 @@ class Configuracoes(ctk.CTkFrame):
             text="Desligado (padrão): o sistema só avisa que falta ingrediente e\n"
                  "deixa continuar a venda mesmo assim, igual já acontece hoje\n"
                  "com o estoque de produto.",
-            font=("Arial", 12),
+            font=("Arial", 11),
             text_color="gray",
             justify="left"
-        ).grid(row=2, column=0, columnspan=2, sticky="w", padx=15, pady=(0, 15))
+        ).grid(row=2, column=0, columnspan=2, sticky="w", padx=15, pady=(0, 8))
 
         # =========================================================
         # SEGURANÇA
         # =========================================================
 
         bloco_seguranca = ctk.CTkFrame(self.scroll)
-        bloco_seguranca.pack(fill="x", padx=10, pady=10)
+        bloco_seguranca.pack(fill="x", padx=10, pady=6)
 
         ctk.CTkLabel(
             bloco_seguranca,
             text="Segurança",
-            font=("Arial", 16, "bold")
-        ).grid(row=0, column=0, columnspan=2, sticky="w", padx=15, pady=(15, 10))
+            font=("Arial", 14, "bold")
+        ).grid(row=0, column=0, columnspan=2, sticky="w", padx=15, pady=(10, 6))
 
         ctk.CTkLabel(
             bloco_seguranca,
             text="Senha para zerar relatórios"
-        ).grid(row=1, column=0, sticky="w", padx=15, pady=(5, 5))
+        ).grid(row=1, column=0, sticky="w", padx=15, pady=(4, 4))
 
-        self.senha_reset = ctk.CTkEntry(bloco_seguranca, width=200, show="•")
-        self.senha_reset.grid(row=1, column=1, padx=15, pady=(5, 5), sticky="w")
+        self.senha_reset = ctk.CTkEntry(bloco_seguranca, width=200, height=26, show="•")
+        self.senha_reset.grid(row=1, column=1, padx=15, pady=(4, 4), sticky="w")
 
         ctk.CTkLabel(
             bloco_seguranca,
             text="Essa senha é pedida sempre que alguém tentar apagar\n"
                  "os pedidos/relatórios na tela de Relatórios.",
-            font=("Arial", 12),
+            font=("Arial", 11),
             text_color="gray",
             justify="left"
-        ).grid(row=2, column=0, columnspan=2, sticky="w", padx=15, pady=(0, 15))
+        ).grid(row=2, column=0, columnspan=2, sticky="w", padx=15, pady=(0, 8))
 
         # =========================================================
         # BOTÕES DE AÇÃO
         # =========================================================
 
         acoes = ctk.CTkFrame(self.scroll, fg_color="transparent")
-        acoes.pack(fill="x", padx=10, pady=15)
+        acoes.pack(fill="x", padx=10, pady=8)
 
         ctk.CTkButton(
             acoes,
             text="💾 Salvar Configurações",
             width=220,
-            height=42,
+            height=34,
             fg_color=tema.COR_VERDE,
             hover_color="#1F6B40",
             command=self.salvar
@@ -191,7 +194,7 @@ class Configuracoes(ctk.CTkFrame):
             acoes,
             text="🖨 Imprimir Cupom de Teste",
             width=220,
-            height=42,
+            height=34,
             fg_color=tema.COR_LARANJA,
             hover_color=tema.COR_LARANJA_ESCURO,
             command=self.imprimir_teste
@@ -201,7 +204,7 @@ class Configuracoes(ctk.CTkFrame):
             acoes,
             text="🗄 Fazer Backup Agora",
             width=220,
-            height=42,
+            height=34,
             fg_color=tema.COR_TEXTO_CLARO,
             hover_color=tema.COR_TEXTO,
             command=self.fazer_backup_manual
@@ -211,21 +214,21 @@ class Configuracoes(ctk.CTkFrame):
             acoes,
             text="🔄 Verificar Atualização",
             width=220,
-            height=42,
+            height=34,
             fg_color=tema.COR_TEXTO_CLARO,
             hover_color=tema.COR_TEXTO,
             command=self.verificar_atualizacao_manual
         ).pack(side="left", padx=10)
 
         self.lbl_status = ctk.CTkLabel(self.scroll, text="", font=("Arial", 13))
-        self.lbl_status.pack(pady=(5, 0))
+        self.lbl_status.pack(pady=(4, 0))
 
         # =========================================================
         # RODAPÉ - VERSÃO E CRÉDITOS
         # =========================================================
 
         rodape = ctk.CTkFrame(self.scroll, fg_color="transparent")
-        rodape.pack(fill="x", pady=(20, 5))
+        rodape.pack(fill="x", pady=(10, 4))
 
         ctk.CTkLabel(
             rodape,
