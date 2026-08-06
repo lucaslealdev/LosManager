@@ -158,10 +158,10 @@ class Caixa(ctk.CTkFrame):
 
         hoje = datetime.now().strftime("%d/%m/%Y")
 
-        pedidos_hoje = banco.buscar(
+        pedidos_hoje_todos = banco.buscar(
             """
             SELECT p.numero, p.hora, COALESCE(c.nome, 'Cliente Balcão'),
-                   p.total, p.pagamento, p.subtotal, p.desconto, p.acrescimo
+                   p.total, p.pagamento, p.subtotal, p.desconto, p.acrescimo, p.status
             FROM pedidos p
             LEFT JOIN clientes c ON c.id = p.cliente_id
             WHERE p.data = ?
@@ -169,6 +169,11 @@ class Caixa(ctk.CTkFrame):
             """,
             (hoje,)
         )
+
+        # Pedido cancelado devolve estoque e dinheiro pro cliente, então não
+        # deve contar em venda, taxa de motoboy nem no dinheiro esperado do
+        # caixa — mesmo raciocínio já aplicado nos cards de Relatórios.
+        pedidos_hoje = [p for p in pedidos_hoje_todos if p[8] != "Cancelado"]
 
         total_geral = sum(p[3] for p in pedidos_hoje)
 

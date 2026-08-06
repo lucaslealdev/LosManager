@@ -273,6 +273,30 @@ class Relatorios(ctk.CTkFrame):
             messagebox.showinfo("Relatórios", f"O pedido Nº {numero} já está cancelado.")
             return
 
+        senha_cadastrada = config.obter("senha_reset").strip()
+
+        if not senha_cadastrada:
+            messagebox.showwarning(
+                "Segurança",
+                "Você ainda não cadastrou uma senha de administrador.\n\n"
+                "Vá em Configurações → Segurança e cadastre uma senha antes "
+                "de cancelar pedidos."
+            )
+            return
+
+        janela_senha = ctk.CTkInputDialog(
+            text="Digite a senha de administrador para cancelar o pedido:",
+            title="Confirmar Senha"
+        )
+        senha_digitada = janela_senha.get_input()
+
+        if senha_digitada is None:
+            return
+
+        if senha_digitada != senha_cadastrada:
+            messagebox.showerror("Segurança", "Senha incorreta.")
+            return
+
         confirmar = messagebox.askyesno(
             "Cancelar Pedido",
             f"Cancelar o pedido Nº {numero}?\n\n"
