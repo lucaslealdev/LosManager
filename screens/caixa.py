@@ -161,7 +161,7 @@ class Caixa(ctk.CTkFrame):
         pedidos_hoje = banco.buscar(
             """
             SELECT p.numero, p.hora, COALESCE(c.nome, 'Cliente Balcão'),
-                   p.total, p.pagamento
+                   p.total, p.pagamento, p.subtotal, p.desconto, p.acrescimo
             FROM pedidos p
             LEFT JOIN clientes c ON c.id = p.cliente_id
             WHERE p.data = ?
@@ -172,10 +172,22 @@ class Caixa(ctk.CTkFrame):
 
         total_geral = sum(p[3] for p in pedidos_hoje)
 
+        # Venda = valor dos produtos (subtotal - desconto); Motoboy = taxa
+        # de entrega (acrescimo). Separados porque a taxa de entrega não é
+        # faturamento da pastelaria, só repassa pro motoboy.
+        total_vendas = sum((p[5] or 0.0) - (p[6] or 0.0) for p in pedidos_hoje)
+        total_motoboy = sum(p[7] or 0.0 for p in pedidos_hoje)
+
         totais_pagamento = {}
+        totais_pagamento_venda = {}
+        totais_pagamento_motoboy = {}
         for pedido in pedidos_hoje:
             forma = pedido[4]
+            venda = (pedido[5] or 0.0) - (pedido[6] or 0.0)
+            motoboy = pedido[7] or 0.0
             totais_pagamento[forma] = totais_pagamento.get(forma, 0) + pedido[3]
+            totais_pagamento_venda[forma] = totais_pagamento_venda.get(forma, 0) + venda
+            totais_pagamento_motoboy[forma] = totais_pagamento_motoboy.get(forma, 0) + motoboy
 
         total_dinheiro = totais_pagamento.get("Dinheiro", 0.0)
 
@@ -204,8 +216,9 @@ class Caixa(ctk.CTkFrame):
         cards.pack(fill="x", pady=10)
 
         self.card(cards, "Pedidos Hoje", str(len(pedidos_hoje)), 0)
-        self.card(cards, "Faturamento Hoje", f"R$ {total_geral:.2f}", 1)
-        self.card(cards, "Dinheiro Esperado", f"R$ {dinheiro_esperado:.2f}", 2)
+        self.card(cards, "Vendas Hoje", f"R$ {total_vendas:.2f}", 1)
+        self.card(cards, "Taxa Motoboy Hoje", f"R$ {total_motoboy:.2f}", 2)
+        self.card(cards, "Dinheiro Esperado", f"R$ {dinheiro_esperado:.2f}", 3)
 
         # ---------------- Totais por forma de pagamento ----------------
 
@@ -220,9 +233,18 @@ class Caixa(ctk.CTkFrame):
 
         if totais_pagamento:
             for forma, valor in totais_pagamento.items():
+
+                venda = totais_pagamento_venda.get(forma, 0.0)
+                motoboy = totais_pagamento_motoboy.get(forma, 0.0)
+
+                texto = f"{forma}: R$ {valor:.2f}  (Vendas: R$ {venda:.2f}"
+                if motoboy:
+                    texto += f"  +  Motoboy: R$ {motoboy:.2f}"
+                texto += ")"
+
                 ctk.CTkLabel(
                     bloco_formas,
-                    text=f"{forma}: R$ {valor:.2f}"
+                    text=texto
                 ).pack(anchor="w", padx=25, pady=2)
         else:
             ctk.CTkLabel(
