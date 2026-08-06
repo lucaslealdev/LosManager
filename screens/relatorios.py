@@ -86,11 +86,21 @@ class Relatorios(ctk.CTkFrame):
             command=self.cancelar_pedido
         ).pack(side="left")
 
+        ctk.CTkButton(
+            acoes_pedido,
+            text="↩️ Reverter Cancelamento",
+            fg_color="#777",
+            hover_color="#555",
+            width=200,
+            command=self.reverter_cancelamento
+        ).pack(side="left", padx=(10, 0))
+
         ctk.CTkLabel(
             acoes_pedido,
             text="Cancelar devolve automaticamente ao estoque os produtos e "
-                 "ingredientes usados no pedido. O pedido continua no "
-                 "histórico, só marcado como \"Cancelado\".",
+                 "ingredientes usados no pedido. Reverter faz o inverso, caso "
+                 "o cancelamento tenha sido por engano. Ambos pedem a senha "
+                 "de administrador e o pedido continua no histórico.",
             font=("Arial", 12),
             text_color="gray"
         ).pack(side="left", padx=15)
@@ -333,6 +343,136 @@ class Relatorios(ctk.CTkFrame):
 
         self.carregar_pedidos()
         self.aplicar_filtro()
+
+    # ======================================================
+    # REVERTER CANCELAMENTO (desfaz um cancelamento feito por engano)
+    # ======================================================
+
+    def reverter_cancelamento(self):
+
+        selecionado = self.tabela.selection()
+
+        if not selecionado:
+            messagebox.showwarning(
+                "Relatórios",
+                "Selecione um pedido na lista para reverter o cancelamento."
+            )
+            return
+
+        valores = self.tabela.item(selecionado[0], "values")
+        pedido_id, numero, status_atual = valores[0], valores[1], valores[7]
+
+        if status_atual != "Cancelado":
+            messagebox.showinfo("Relatórios", f"O pedido Nº {numero} não está cancelado.")
+            return
+
+        senha_cadastrada = config.obter("senha_reset").strip()
+
+        if not senha_cadastrada:
+            messagebox.showwarning(
+                "Segurança",
+                "Você ainda não cadastrou uma senha de administrador.\n\n"
+                "Vá em Configurações → Segurança e cadastre uma senha antes "
+                "de reverter cancelamentos."
+            )
+            return
+
+        janela_senha = ctk.CTkInputDialog(
+            text="Digite a senha de administrador para reverter o cancelamento:",
+            title="Confirmar Senha"
+        )
+        senha_digitada = janela_senha.get_input()
+
+        if senha_digitada is None:
+            return
+
+        if senha_digitada != senha_cadastrada:
+            messagebox.showerror("Segurança", "Senha incorreta.")
+            return
+
+        confirmar = messagebox.askyesno(
+            "Reverter Cancelamento",
+            f"Reverter o cancelamento do pedido Nº {numero}?\n\n"
+            "O pedido volta a valer como \"Finalizado\", contando de novo "
+            "no faturamento, e o estoque de produtos e ingredientes usados "
+            "nele será descontado outra vez."
+        )
+
+        if not confirmar:
+            return
+
+        try:
+            self.reconsumir_estoque_pedido(pedido_id)
+
+            banco.executar_sem_commit(
+                "UPDATE pedidos SET status='Finalizado' WHERE id=?", (pedido_id,)
+            )
+
+        except Exception as erro:
+            banco.rollback()
+            messagebox.showerror(
+                "Erro ao reverter cancelamento",
+                f"Não foi possível reverter o cancelamento:\n\n{erro}"
+            )
+            return
+
+        banco.commit()
+
+        messagebox.showinfo(
+            "Relatórios",
+            f"Cancelamento do pedido Nº {numero} revertido. Estoque descontado novamente."
+        )
+
+        self.carregar_pedidos()
+        self.aplicar_filtro()
+
+    # ======================================================
+
+    def reconsumir_estoque_pedido(self, pedido_id):
+        """Desconta de novo o estoque de produto e ingredientes de um
+        pedido que estava cancelado — o inverso exato de
+        `devolver_estoque_pedido`, e o mesmo raciocínio de abatimento de
+        `Pedidos.gravar_pedido()`. Roda dentro da transação manual de
+        `reverter_cancelamento`."""
+
+        agora = datetime.now()
+        data_str = agora.strftime("%d/%m/%Y")
+        hora_str = agora.strftime("%H:%M")
+
+        itens = banco.buscar(
+            "SELECT produto_id, quantidade FROM itens_pedido WHERE pedido_id=?",
+            (pedido_id,)
+        )
+
+        for produto_id, quantidade in itens:
+
+            banco.executar_sem_commit(
+                "UPDATE produtos SET estoque = MAX(0, estoque - ?) WHERE id=?",
+                (quantidade, produto_id)
+            )
+
+            receita = banco.buscar(
+                "SELECT ingrediente_id, quantidade FROM receita_produto WHERE produto_id=?",
+                (produto_id,)
+            )
+
+            for ingrediente_id, quantidade_unitaria in receita:
+
+                quantidade_total = quantidade_unitaria * quantidade
+
+                banco.executar_sem_commit(
+                    "UPDATE ingredientes SET estoque_atual = MAX(0, estoque_atual - ?) WHERE id=?",
+                    (quantidade_total, ingrediente_id)
+                )
+
+                banco.executar_sem_commit(
+                    """
+                    INSERT INTO movimentos_ingrediente
+                        (ingrediente_id, tipo, quantidade, pedido_id, data, hora)
+                    VALUES (?, 'saida', ?, ?, ?, ?)
+                    """,
+                    (ingrediente_id, quantidade_total, pedido_id, data_str, hora_str)
+                )
 
     # ======================================================
 
