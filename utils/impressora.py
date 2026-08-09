@@ -48,6 +48,13 @@ FONTE_DUPLA = GS + b"!" + b"\x11"
 PULAR_LINHAS = lambda n: b"\n" * n
 CORTAR_PAPEL = GS + b"V" + b"\x01"
 
+# Vídeo invertido (letra branca em fundo preto). É assim que a
+# observação do item sai destacada no cupom, pra cozinha não passar
+# batido num "sem cebola". Comando padrão ESC/POS, entendido pela
+# grande maioria das térmicas.
+INVERTIDO_ON = GS + b"B" + b"\x01"
+INVERTIDO_OFF = GS + b"B" + b"\x00"
+
 
 # =================================================================
 # FUNÇÕES DE APOIO
@@ -95,6 +102,23 @@ def _quebrar_texto(texto, largura):
         linhas.append(atual)
 
     return linhas
+
+
+def _bloco_destacado(texto, largura):
+    """Monta um bloco em vídeo invertido (fundo preto) ocupando a
+    largura inteira do papel. Cada linha é preenchida com espaços até o
+    fim justamente para o fundo preto virar uma tarja cheia, em vez de
+    parar onde o texto acaba."""
+
+    buffer = b""
+
+    for linha in _quebrar_texto(texto, largura - 2):
+        buffer += INVERTIDO_ON + NEGRITO_ON
+        buffer += _texto(" " + linha.ljust(largura - 1))
+        buffer += NEGRITO_OFF + INVERTIDO_OFF
+        buffer += b"\n"
+
+    return buffer
 
 
 def _logo_para_escpos(largura):
@@ -166,8 +190,12 @@ def montar_cupom(dados_loja, pedido, itens, largura=32):
 
     itens = [
         {"nome": "Pastel de Carne", "qtd": 2,
-         "valor_unitario": 12.00, "subtotal": 24.00}, ...
+         "valor_unitario": 12.00, "subtotal": 24.00,
+         "observacao": "retirar o milho"}, ...
     ]
+
+    A "observacao" de cada item é opcional e sai logo abaixo do produto
+    em tarja preta (vídeo invertido), pra cozinha não passar batido.
     """
 
     buffer = b""
@@ -212,6 +240,11 @@ def montar_cupom(dados_loja, pedido, itens, largura=32):
         buffer += _texto(
             _linha_dupla_coluna(unit_str, valor_str, largura) + "\n"
         )
+
+        # Observação do item (ex: "retirar o milho") sai em tarja preta
+        # logo abaixo do produto a que pertence.
+        if item.get("observacao"):
+            buffer += _bloco_destacado(f"** {item['observacao'].upper()}", largura)
 
     buffer += _texto("-" * largura + "\n")
 

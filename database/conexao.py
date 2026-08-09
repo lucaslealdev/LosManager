@@ -183,6 +183,8 @@ class Banco:
 
             subtotal REAL,
 
+            observacao TEXT,
+
             FOREIGN KEY(pedido_id)
             REFERENCES pedidos(id),
 
@@ -191,6 +193,11 @@ class Banco:
 
         )
         """)
+
+        # Bancos criados antes da observação por item não têm essa
+        # coluna — o CREATE TABLE IF NOT EXISTS acima não a acrescenta
+        # sozinho, então adiciona na mão só se estiver faltando.
+        self._garantir_coluna("itens_pedido", "observacao", "TEXT")
 
         # =====================================================
         # CAIXA
@@ -324,6 +331,25 @@ class Banco:
         """)
 
         self.conexao.commit()
+
+    # =========================================================
+
+    def _garantir_coluna(self, tabela, coluna, tipo):
+        """Acrescenta uma coluna nova a uma tabela que já existe em
+        bancos antigos (o `CREATE TABLE IF NOT EXISTS` só vale para
+        bancos criados do zero). Roda toda vez que o app abre, mas o
+        `ALTER TABLE` em si só acontece na primeira vez."""
+
+        colunas = self.cursor.execute(
+            f"PRAGMA table_info({tabela})"
+        ).fetchall()
+
+        nomes = [linha[1] for linha in colunas]
+
+        if coluna not in nomes:
+            self.cursor.execute(
+                f"ALTER TABLE {tabela} ADD COLUMN {coluna} {tipo}"
+            )
 
     # =========================================================
 

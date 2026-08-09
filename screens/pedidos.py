@@ -187,11 +187,27 @@ class Pedidos(ctk.CTkFrame):
         self.quantidade.insert(0, "1")
         self.quantidade.grid(row=1, column=3, sticky="n", pady=10)
 
+        ctk.CTkLabel(
+            topo,
+            text="Obs. do item"
+        ).grid(row=1, column=4, sticky="n", pady=10, padx=(15, 5))
+
+        # Observação por item (não do pedido inteiro): é onde vai
+        # "sem milho", "sem cebola", etc. Sai destacado no cupom pra
+        # cozinha não passar batido.
+        self.observacao_item = ctk.CTkEntry(
+            topo,
+            width=200,
+            placeholder_text="Ex: retirar o milho"
+        )
+        self.observacao_item.grid(row=1, column=5, sticky="n", pady=10)
+        self.observacao_item.bind("<Return>", lambda e: self.adicionar_item())
+
         ctk.CTkButton(
             topo,
             text="Adicionar",
             command=self.adicionar_item
-        ).grid(row=1, column=4, padx=15, sticky="n", pady=10)
+        ).grid(row=1, column=6, padx=15, sticky="n", pady=10)
 
         ctk.CTkButton(
             topo,
@@ -199,7 +215,7 @@ class Pedidos(ctk.CTkFrame):
             fg_color="#a33",
             hover_color="#822",
             command=self.remover_item
-        ).grid(row=1, column=5, padx=5, sticky="n", pady=10)
+        ).grid(row=1, column=7, padx=5, sticky="n", pady=10)
 
         # =========================
         # Rodapé é criado (e empacotado) antes da tabela do carrinho só
@@ -271,17 +287,19 @@ class Pedidos(ctk.CTkFrame):
 
         self.tabela = ttk.Treeview(
             self.scroll,
-            columns=("produto", "qtd", "valor", "subtotal"),
+            columns=("produto", "observacao", "qtd", "valor", "subtotal"),
             show="headings",
             height=linhas
         )
 
         self.tabela.heading("produto", text="Produto")
+        self.tabela.heading("observacao", text="Observação")
         self.tabela.heading("qtd", text="Qtd")
         self.tabela.heading("valor", text="Valor")
         self.tabela.heading("subtotal", text="Subtotal")
 
-        self.tabela.column("produto", width=350)
+        self.tabela.column("produto", width=300)
+        self.tabela.column("observacao", width=220)
         self.tabela.column("qtd", width=80, anchor="center")
         self.tabela.column("valor", width=120, anchor="e")
         self.tabela.column("subtotal", width=120, anchor="e")
@@ -655,13 +673,16 @@ class Pedidos(ctk.CTkFrame):
 
         self.total += subtotal
 
+        observacao = self.observacao_item.get().strip()
+
         # Guarda o item na lista real (fonte da verdade)
         self.itens.append({
             "produto_id": produto["id"],
             "nome": produto["nome"],
             "qtd": qtd,
             "valor_unitario": produto["preco"],
-            "subtotal": subtotal
+            "subtotal": subtotal,
+            "observacao": observacao
         })
 
         self.tabela.insert(
@@ -669,6 +690,7 @@ class Pedidos(ctk.CTkFrame):
             "end",
             values=(
                 produto["nome"],
+                observacao,
                 qtd,
                 f"R$ {produto['preco']:.2f}",
                 f"R$ {subtotal:.2f}"
@@ -683,6 +705,7 @@ class Pedidos(ctk.CTkFrame):
         )
         self.quantidade.delete(0, "end")
         self.quantidade.insert(0, "1")
+        self.observacao_item.delete(0, "end")
         self.busca_produto.focus()
 
     # ======================================================
@@ -729,6 +752,7 @@ class Pedidos(ctk.CTkFrame):
 
         self.quantidade.delete(0, "end")
         self.quantidade.insert(0, "1")
+        self.observacao_item.delete(0, "end")
 
     # ======================================================
 
@@ -786,12 +810,14 @@ class Pedidos(ctk.CTkFrame):
                 banco.executar_sem_commit(
                     """
                     INSERT INTO itens_pedido
-                        (pedido_id, produto_id, quantidade, valor_unitario, subtotal)
-                    VALUES (?, ?, ?, ?, ?)
+                        (pedido_id, produto_id, quantidade, valor_unitario,
+                         subtotal, observacao)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     (
                         pedido_id, item["produto_id"], item["qtd"],
-                        item["valor_unitario"], item["subtotal"]
+                        item["valor_unitario"], item["subtotal"],
+                        item.get("observacao", "")
                     )
                 )
 

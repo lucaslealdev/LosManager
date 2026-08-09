@@ -355,12 +355,16 @@ class Configuracoes(ctk.CTkFrame):
             "observacao": "Isto é apenas um teste de impressão."
         }
 
+        # O item de teste leva uma observação de propósito: é assim que
+        # se confere se a impressora imprime a tarja preta (vídeo
+        # invertido) usada para destacar "sem cebola", "retirar o milho"...
         itens_teste = [
             {
                 "nome": "Item de Teste",
                 "qtd": 1,
                 "valor_unitario": 10.00,
-                "subtotal": 10.00
+                "subtotal": 10.00,
+                "observacao": "teste de destaque"
             }
         ]
 
