@@ -58,12 +58,16 @@ class Dashboard(ctk.CTkFrame):
         grade = ctk.CTkFrame(self.scroll, fg_color="transparent")
         grade.pack(expand=True)
 
-        # Define os 4 cards: (ícone, cor, título, valor)
+        # Venda e taxa de motoboy aparecem separadas (mesmo critério do
+        # Caixa e dos Relatórios: a taxa só repassa pro motoboy, não é
+        # faturamento da pastelaria), com o total logo ao lado.
         cartoes = [
             ("🧾", "#3b82f6", "Pedidos Hoje", str(dados["pedidos_hoje"])),
+            ("💰", "#22a559", "Vendas Hoje", f"R$ {dados['vendas']:.2f}"),
+            ("🛵", "#ef7c1a", "Taxa Motoboy Hoje", f"R$ {dados['motoboy']:.2f}"),
+            ("🧮", "#0ea5e9", "Faturamento Hoje", f"R$ {dados['faturamento']:.2f}"),
             ("👥", "#8b5cf6", "Clientes", str(dados["clientes"])),
             ("🥟", "#f5a623", "Produtos", str(dados["produtos"])),
-            ("💰", "#22a559", "Faturamento Hoje", f"R$ {dados['faturamento']:.2f}"),
         ]
 
         # 2 colunas x 2 linhas, todas do mesmo tamanho
@@ -188,8 +192,15 @@ class Dashboard(ctk.CTkFrame):
 
         hoje = datetime.now().strftime("%d/%m/%Y")
 
+        # Pedido cancelado não conta nem na quantidade nem no
+        # faturamento — o mesmo critério já usado em Caixa e Relatórios.
+        # O `status IS NULL` cobre pedidos antigos, gravados antes da
+        # coluna de status passar a ser sempre preenchida.
+        nao_cancelado = "(status IS NULL OR status != 'Cancelado')"
+
         pedidos_hoje = banco.buscar_um(
-            "SELECT COUNT(*) FROM pedidos WHERE data=?", (hoje,)
+            f"SELECT COUNT(*) FROM pedidos WHERE data=? AND {nao_cancelado}",
+            (hoje,)
         )
 
         clientes = banco.buscar_um(
@@ -200,13 +211,26 @@ class Dashboard(ctk.CTkFrame):
             "SELECT COUNT(*) FROM produtos WHERE ativo=1"
         )
 
-        faturamento = banco.buscar_um(
-            "SELECT COALESCE(SUM(total), 0) FROM pedidos WHERE data=?", (hoje,)
+        # Venda = produtos (subtotal - desconto); motoboy = taxa de
+        # entrega (acrescimo); faturamento = o que o cliente pagou.
+        valores = banco.buscar_um(
+            f"""
+            SELECT COALESCE(SUM(COALESCE(subtotal, 0) - COALESCE(desconto, 0)), 0),
+                   COALESCE(SUM(COALESCE(acrescimo, 0)), 0),
+                   COALESCE(SUM(COALESCE(total, 0)), 0)
+            FROM pedidos
+            WHERE data=? AND {nao_cancelado}
+            """,
+            (hoje,)
         )
+
+        vendas, motoboy, faturamento = valores if valores else (0.0, 0.0, 0.0)
 
         return {
             "pedidos_hoje": pedidos_hoje[0] if pedidos_hoje else 0,
             "clientes": clientes[0] if clientes else 0,
             "produtos": produtos[0] if produtos else 0,
-            "faturamento": faturamento[0] if faturamento else 0.0,
+            "vendas": vendas,
+            "motoboy": motoboy,
+            "faturamento": faturamento,
         }

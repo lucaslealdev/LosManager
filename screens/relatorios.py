@@ -5,6 +5,7 @@ from datetime import datetime
 from database.conexao import banco
 from utils import config
 from utils import busca
+from utils import calendario
 from utils import tema
 from utils import responsivo
 
@@ -44,7 +45,7 @@ class Relatorios(ctk.CTkFrame):
         self.periodo = ctk.CTkSegmentedButton(
             topo,
             values=["Hoje", "7 dias", "Este mês", "Tudo"],
-            command=lambda valor: self.aplicar_filtro()
+            command=self.selecionar_periodo
         )
         self.periodo.set("Hoje")
         self.periodo.grid(row=0, column=1, padx=10)
@@ -58,6 +59,42 @@ class Relatorios(ctk.CTkFrame):
         )
         self.busca.grid(row=0, column=3, padx=10)
         self.busca.bind("<KeyRelease>", lambda evento: self.aplicar_filtro())
+
+        # ---------------- Filtro por data exata ----------------
+        # Linha própria (não cabe junto com o período em telas 1366px)
+        # e dentro de um frame, pra as larguras daqui não mexerem nas
+        # colunas do grid de cima. Quando há data escolhida, ela manda
+        # no filtro; clicar num período volta a valer o período.
+
+        linha_data = ctk.CTkFrame(topo, fg_color="transparent")
+        linha_data.grid(row=1, column=0, columnspan=4, sticky="w", padx=10, pady=(0, 12))
+
+        self.data_filtro = None
+
+        ctk.CTkButton(
+            linha_data,
+            text="📅 Escolher data",
+            width=150,
+            command=self.abrir_calendario
+        ).pack(side="left")
+
+        self.lbl_data_filtro = ctk.CTkLabel(
+            linha_data,
+            text="Nenhuma data escolhida (usando o período acima)",
+            font=("Arial", 13, "italic"),
+            text_color="gray"
+        )
+        self.lbl_data_filtro.pack(side="left", padx=12)
+
+        self.botao_limpar_data = ctk.CTkButton(
+            linha_data,
+            text="✖ Limpar data",
+            width=120,
+            fg_color="#777",
+            hover_color="#555",
+            command=self.limpar_data_filtro
+        )
+        # Só aparece quando há uma data escolhida (ver atualizar_rotulo_data)
 
         # ---------------- Cards de resumo ----------------
 
@@ -77,8 +114,18 @@ class Relatorios(ctk.CTkFrame):
         acoes_pedido = ctk.CTkFrame(self.scroll, fg_color="transparent")
         acoes_pedido.pack(fill="x", pady=(0, 10))
 
+        botoes_pedido = ctk.CTkFrame(acoes_pedido, fg_color="transparent")
+        botoes_pedido.pack(fill="x")
+
         ctk.CTkButton(
-            acoes_pedido,
+            botoes_pedido,
+            text="🔍 Ver Pedido",
+            width=140,
+            command=self.ver_pedido
+        ).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(
+            botoes_pedido,
             text="🚫 Cancelar Pedido Selecionado",
             fg_color=tema.COR_VERMELHO,
             hover_color="#B93601",
@@ -87,7 +134,7 @@ class Relatorios(ctk.CTkFrame):
         ).pack(side="left")
 
         ctk.CTkButton(
-            acoes_pedido,
+            botoes_pedido,
             text="↩️ Reverter Cancelamento",
             fg_color="#777",
             hover_color="#555",
@@ -95,6 +142,9 @@ class Relatorios(ctk.CTkFrame):
             command=self.reverter_cancelamento
         ).pack(side="left", padx=(10, 0))
 
+        # Texto explicativo abaixo dos botões, e com `wraplength`: ao
+        # lado deles e sem quebra, ele esticava a linha para ~1900px e
+        # ficava cortado em telas 1366x768.
         ctk.CTkLabel(
             acoes_pedido,
             text="Cancelar devolve automaticamente ao estoque os produtos e "
@@ -102,8 +152,10 @@ class Relatorios(ctk.CTkFrame):
                  "o cancelamento tenha sido por engano. Ambos pedem a senha "
                  "de administrador e o pedido continua no histórico.",
             font=("Arial", 12),
-            text_color="gray"
-        ).pack(side="left", padx=15)
+            text_color="gray",
+            wraplength=900,
+            justify="left"
+        ).pack(anchor="w", pady=(8, 0))
 
         # ---------------- Zona de perigo: zerar relatórios ----------------
 
@@ -260,6 +312,25 @@ class Relatorios(ctk.CTkFrame):
 
         self.carregar_pedidos()
         self.aplicar_filtro()
+
+    # ======================================================
+    # VER PEDIDO (o que foi vendido naquele pedido)
+    # ======================================================
+
+    def ver_pedido(self):
+
+        selecionado = self.tabela.selection()
+
+        if not selecionado:
+            messagebox.showwarning(
+                "Relatórios",
+                "Selecione um pedido na lista para ver os itens."
+            )
+            return
+
+        pedido_id = self.tabela.item(selecionado[0], "values")[0]
+
+        JanelaDetalhePedido(self, pedido_id)
 
     # ======================================================
     # CANCELAR PEDIDO (devolve estoque de produto + ingredientes)
@@ -538,6 +609,57 @@ class Relatorios(ctk.CTkFrame):
 
     # ======================================================
 
+    def selecionar_periodo(self, valor=None):
+        """Clicar num período descarta a data exata — os dois filtros
+        são alternativos, não somados."""
+
+        if self.data_filtro is not None:
+            self.data_filtro = None
+            self.atualizar_rotulo_data()
+
+        self.aplicar_filtro()
+
+    # ======================================================
+
+    def abrir_calendario(self):
+
+        calendario.escolher_data(
+            self,
+            ao_escolher=self.definir_data_filtro,
+            data_inicial=self.data_filtro
+        )
+
+    def definir_data_filtro(self, data_texto):
+
+        self.data_filtro = data_texto
+        self.atualizar_rotulo_data()
+        self.aplicar_filtro()
+
+    def limpar_data_filtro(self):
+
+        self.data_filtro = None
+        self.atualizar_rotulo_data()
+        self.aplicar_filtro()
+
+    def atualizar_rotulo_data(self):
+
+        if self.data_filtro:
+            self.lbl_data_filtro.configure(
+                text=f"Mostrando apenas {self.data_filtro}",
+                text_color=tema.COR_LARANJA,
+                font=("Arial", 13, "bold")
+            )
+            self.botao_limpar_data.pack(side="left")
+        else:
+            self.lbl_data_filtro.configure(
+                text="Nenhuma data escolhida (usando o período acima)",
+                text_color="gray",
+                font=("Arial", 13, "italic")
+            )
+            self.botao_limpar_data.pack_forget()
+
+    # ======================================================
+
     def aplicar_filtro(self):
 
         agora = datetime.now()
@@ -553,16 +675,25 @@ class Relatorios(ctk.CTkFrame):
             except (ValueError, TypeError):
                 data_dt = None
 
-            if periodo == "Hoje" and data_dt and data_dt.date() != agora.date():
-                continue
+            # Data exata escolhida no calendário manda no filtro; sem
+            # ela, vale o período selecionado.
+            if self.data_filtro:
 
-            if periodo == "7 dias" and data_dt and (agora - data_dt).days > 7:
-                continue
+                if data != self.data_filtro:
+                    continue
 
-            if periodo == "Este mês" and data_dt and (
-                data_dt.month != agora.month or data_dt.year != agora.year
-            ):
-                continue
+            else:
+
+                if periodo == "Hoje" and data_dt and data_dt.date() != agora.date():
+                    continue
+
+                if periodo == "7 dias" and data_dt and (agora - data_dt).days > 7:
+                    continue
+
+                if periodo == "Este mês" and data_dt and (
+                    data_dt.month != agora.month or data_dt.year != agora.year
+                ):
+                    continue
 
             if termo:
                 if not busca.contem(termo, cliente) and termo not in str(numero):
@@ -628,3 +759,172 @@ class Relatorios(ctk.CTkFrame):
 
         ctk.CTkLabel(c, text=titulo, font=("Arial", 14)).pack(pady=(15, 5))
         ctk.CTkLabel(c, text=valor, font=("Arial", 22, "bold")).pack(pady=(0, 15))
+
+
+# ==========================================================
+# JANELA: DETALHE DO PEDIDO (o que foi vendido)
+# ==========================================================
+
+
+class JanelaDetalhePedido(ctk.CTkToplevel):
+
+    def __init__(self, master, pedido_id):
+        super().__init__(master.winfo_toplevel())
+
+        self.pedido_id = pedido_id
+
+        self.title("Detalhe do Pedido")
+        self.transient(master.winfo_toplevel())
+
+        self.montar_conteudo()
+
+        # Tamanho aplicado só depois que o Tk roda os `after` internos
+        # do CustomTkinter — direto no __init__ a janela abre minúscula.
+        self.after(60, self._ajustar_tamanho)
+
+        self.grab_set()
+
+    # ======================================================
+
+    def _ajustar_tamanho(self):
+
+        self.update_idletasks()
+
+        largura = min(max(self.winfo_reqwidth(), 620), max(int(self.winfo_screenwidth() * 0.9), 620))
+        altura = min(max(self.winfo_reqheight(), 460), max(int(self.winfo_screenheight() * 0.85), 460))
+
+        self.geometry(f"{largura}x{altura}")
+        self.minsize(620, 460)
+
+    # ======================================================
+
+    def montar_conteudo(self):
+
+        pedido = banco.buscar_um(
+            """
+            SELECT p.numero, p.data, p.hora, COALESCE(c.nome, 'Cliente Balcão'),
+                   p.subtotal, p.desconto, p.acrescimo, p.total,
+                   p.pagamento, p.status
+            FROM pedidos p
+            LEFT JOIN clientes c ON c.id = p.cliente_id
+            WHERE p.id = ?
+            """,
+            (self.pedido_id,)
+        )
+
+        if pedido is None:
+            ctk.CTkLabel(
+                self,
+                text="Pedido não encontrado.",
+                font=("Arial", 15)
+            ).pack(padx=30, pady=30)
+            return
+
+        (numero, data, hora, cliente, subtotal, desconto,
+         acrescimo, total, pagamento, status) = pedido
+
+        scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=15, pady=15)
+
+        # ---------------- Cabeçalho ----------------
+
+        ctk.CTkLabel(
+            scroll,
+            text=f"Pedido Nº {int(numero):04d}",
+            font=("Arial", 22, "bold")
+        ).pack(anchor="w")
+
+        if status == "Cancelado":
+            ctk.CTkLabel(
+                scroll,
+                text="🚫 PEDIDO CANCELADO",
+                font=("Arial", 14, "bold"),
+                text_color=tema.COR_VERMELHO
+            ).pack(anchor="w", pady=(4, 0))
+
+        ctk.CTkLabel(
+            scroll,
+            text=f"{data} às {hora}  •  Cliente: {cliente}  •  Pagamento: {pagamento}",
+            font=("Arial", 13),
+            text_color="gray"
+        ).pack(anchor="w", pady=(4, 12))
+
+        # ---------------- Itens ----------------
+
+        itens = banco.buscar(
+            """
+            SELECT COALESCE(pr.nome, 'Produto removido'), i.quantidade,
+                   i.valor_unitario, i.subtotal, i.observacao
+            FROM itens_pedido i
+            LEFT JOIN produtos pr ON pr.id = i.produto_id
+            WHERE i.pedido_id = ?
+            ORDER BY i.id
+            """,
+            (self.pedido_id,)
+        )
+
+        tabela = ttk.Treeview(
+            scroll,
+            columns=("produto", "observacao", "qtd", "valor", "subtotal"),
+            show="headings",
+            height=max(len(itens), 3)
+        )
+
+        for chave, texto, largura, ancora in [
+            ("produto", "Produto", 240, "w"),
+            ("observacao", "Observação", 190, "w"),
+            ("qtd", "Qtd", 60, "center"),
+            ("valor", "Valor", 90, "e"),
+            ("subtotal", "Subtotal", 90, "e"),
+        ]:
+            tabela.heading(chave, text=texto)
+            tabela.column(chave, width=largura, anchor=ancora)
+
+        for nome, qtd, valor_unitario, item_subtotal, observacao in itens:
+            tabela.insert(
+                "", "end",
+                values=(
+                    nome,
+                    observacao or "",
+                    qtd,
+                    f"R$ {valor_unitario:.2f}",
+                    f"R$ {item_subtotal:.2f}"
+                )
+            )
+
+        tabela.pack(fill="x", pady=(0, 12))
+
+        if not itens:
+            ctk.CTkLabel(
+                scroll,
+                text="Este pedido não tem itens registrados.",
+                text_color="gray"
+            ).pack(anchor="w", pady=(0, 12))
+
+        # ---------------- Totais ----------------
+
+        totais = ctk.CTkFrame(scroll)
+        totais.pack(fill="x")
+
+        def linha_total(rotulo, valor, negrito=False):
+            fonte = ("Arial", 15, "bold") if negrito else ("Arial", 13)
+            linha = ctk.CTkFrame(totais, fg_color="transparent")
+            linha.pack(fill="x", padx=15, pady=3)
+            ctk.CTkLabel(linha, text=rotulo, font=fonte).pack(side="left")
+            ctk.CTkLabel(linha, text=valor, font=fonte).pack(side="right")
+
+        ctk.CTkLabel(totais, text="").pack(pady=2)
+        linha_total("Vendas (produtos)", f"R$ {(subtotal or 0.0) - (desconto or 0.0):.2f}")
+
+        if acrescimo:
+            linha_total("Taxa motoboy", f"R$ {acrescimo:.2f}")
+
+        linha_total("TOTAL", f"R$ {total:.2f}", negrito=True)
+        ctk.CTkLabel(totais, text="").pack(pady=2)
+
+        ctk.CTkButton(
+            scroll,
+            text="Fechar",
+            width=120,
+            command=self.destroy
+        ).pack(anchor="e", pady=(12, 0))

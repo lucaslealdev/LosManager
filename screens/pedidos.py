@@ -187,35 +187,46 @@ class Pedidos(ctk.CTkFrame):
         self.quantidade.insert(0, "1")
         self.quantidade.grid(row=1, column=3, sticky="n", pady=10)
 
+        # ---------------- Observação + botões (linha própria) ----------------
+        # Ficam numa segunda linha, dentro de um frame só deles, porque
+        # tudo numa linha só não cabia em telas 1366x768 (PC antigo da
+        # loja): os botões saíam para fora da área visível. O frame
+        # isola essas larguras das colunas do grid de cima.
+
+        linha_acoes = ctk.CTkFrame(topo, fg_color="transparent")
+        linha_acoes.grid(row=2, column=0, columnspan=4, sticky="w", padx=10, pady=(0, 10))
+
         ctk.CTkLabel(
-            topo,
+            linha_acoes,
             text="Obs. do item"
-        ).grid(row=1, column=4, sticky="n", pady=10, padx=(15, 5))
+        ).pack(side="left", padx=(0, 5))
 
         # Observação por item (não do pedido inteiro): é onde vai
         # "sem milho", "sem cebola", etc. Sai destacado no cupom pra
         # cozinha não passar batido.
         self.observacao_item = ctk.CTkEntry(
-            topo,
-            width=200,
+            linha_acoes,
+            width=220,
             placeholder_text="Ex: retirar o milho"
         )
-        self.observacao_item.grid(row=1, column=5, sticky="n", pady=10)
+        self.observacao_item.pack(side="left")
         self.observacao_item.bind("<Return>", lambda e: self.adicionar_item())
 
         ctk.CTkButton(
-            topo,
+            linha_acoes,
             text="Adicionar",
+            width=130,
             command=self.adicionar_item
-        ).grid(row=1, column=6, padx=15, sticky="n", pady=10)
+        ).pack(side="left", padx=(15, 8))
 
         ctk.CTkButton(
-            topo,
+            linha_acoes,
             text="Remover selecionado",
+            width=170,
             fg_color="#a33",
             hover_color="#822",
             command=self.remover_item
-        ).grid(row=1, column=7, padx=5, sticky="n", pady=10)
+        ).pack(side="left")
 
         # =========================
         # Rodapé é criado (e empacotado) antes da tabela do carrinho só
