@@ -9,6 +9,7 @@ from utils import config
 from utils import impressora
 from utils import tema
 from utils import atualizacao
+from utils import autoatualizador
 
 
 class Configuracoes(ctk.CTkFrame):
@@ -174,6 +175,35 @@ class Configuracoes(ctk.CTkFrame):
         ).grid(row=2, column=0, columnspan=2, sticky="w", padx=15, pady=(0, 8))
 
         # =========================================================
+        # ATUALIZAÇÕES
+        # =========================================================
+
+        bloco_atualizacao = ctk.CTkFrame(self.scroll)
+        bloco_atualizacao.pack(fill="x", padx=10, pady=6)
+
+        ctk.CTkLabel(
+            bloco_atualizacao,
+            text="Atualizações do Sistema",
+            font=("Arial", 14, "bold")
+        ).grid(row=0, column=0, columnspan=2, sticky="w", padx=15, pady=(10, 6))
+
+        ctk.CTkLabel(bloco_atualizacao, text="Repositório no GitHub").grid(
+            row=1, column=0, sticky="w", padx=15, pady=(4, 4)
+        )
+
+        self.repo_atualizacao = ctk.CTkEntry(bloco_atualizacao, width=350, height=26)
+        self.repo_atualizacao.grid(row=1, column=1, padx=15, pady=(4, 4), sticky="w")
+
+        ctk.CTkLabel(
+            bloco_atualizacao,
+            text="Formato \"usuario/repositorio\", ex: ramonxxl/LosManager.\n"
+                 "É onde o programa procura e baixa novas versões sozinho.",
+            font=("Arial", 11),
+            text_color="gray",
+            justify="left"
+        ).grid(row=2, column=0, columnspan=2, sticky="w", padx=15, pady=(0, 8))
+
+        # =========================================================
         # BOTÕES DE AÇÃO
         # =========================================================
 
@@ -271,6 +301,9 @@ class Configuracoes(ctk.CTkFrame):
         self.senha_reset.delete(0, "end")
         self.senha_reset.insert(0, config.obter("senha_reset"))
 
+        self.repo_atualizacao.delete(0, "end")
+        self.repo_atualizacao.insert(0, config.obter("repo_atualizacao", atualizacao.REPOSITORIO_PADRAO))
+
         impressora_salva = config.obter_impressora_nome()
 
         if impressora_salva:
@@ -315,6 +348,7 @@ class Configuracoes(ctk.CTkFrame):
         config.definir("loja_endereco", self.loja_endereco.get().strip())
         config.definir("loja_telefone", self.loja_telefone.get().strip())
         config.definir("senha_reset", self.senha_reset.get().strip())
+        config.definir("repo_atualizacao", self.repo_atualizacao.get().strip() or atualizacao.REPOSITORIO_PADRAO)
         config.definir("impressora_nome", self.combo_impressoras.get().strip())
         config.definir("impressora_largura", str(largura))
         config.definir("bloquear_venda_sem_estoque_ingrediente", self.bloquear_estoque_ingrediente.get())
@@ -431,27 +465,45 @@ class Configuracoes(ctk.CTkFrame):
         self.lbl_status.configure(text="🔎 Verificando atualização...", text_color="gray")
 
         atualizacao.verificar_manualmente(
-            lambda atual, nova, url: self.after(0, lambda: self._resultado_atualizacao(atual, nova, url)),
+            lambda atual, nova, url, url_download: self.after(0, lambda: self._resultado_atualizacao(atual, nova, url, url_download)),
             lambda erro: self.after(0, lambda: self._erro_atualizacao(erro))
         )
 
     # ======================================================
 
-    def _resultado_atualizacao(self, versao_atual, versao_nova, url_release):
+    def _resultado_atualizacao(self, versao_atual, versao_nova, url_release, url_download):
 
         self.lbl_status.configure(text="")
 
         if versao_nova > versao_atual:
 
-            abrir = messagebox.askyesno(
+            # Sem um .zip anexado ao release não tem o que baixar/instalar
+            # sozinho — cai pro fluxo antigo de abrir a página no navegador.
+            if not url_download:
+
+                abrir = messagebox.askyesno(
+                    "Atualização disponível",
+                    f"Você está usando a versão {atualizacao.formatar_versao(versao_atual)}.\n"
+                    f"A versão {atualizacao.formatar_versao(versao_nova)} já está disponível no GitHub.\n\n"
+                    "Não foi possível encontrar o arquivo de instalação automática "
+                    "nesse release. Deseja abrir a página de download agora?"
+                )
+
+                if abrir:
+                    webbrowser.open(url_release)
+
+                return
+
+            atualizar = messagebox.askyesno(
                 "Atualização disponível",
                 f"Você está usando a versão {atualizacao.formatar_versao(versao_atual)}.\n"
-                f"A versão {atualizacao.formatar_versao(versao_nova)} já está disponível no GitHub.\n\n"
-                "Deseja abrir a página de download agora?"
+                f"A versão {atualizacao.formatar_versao(versao_nova)} já está disponível.\n\n"
+                "Deseja atualizar agora? O programa vai baixar a nova versão, "
+                "fechar e abrir de novo sozinho."
             )
 
-            if abrir:
-                webbrowser.open(url_release)
+            if atualizar:
+                autoatualizador.iniciar(self, url_download)
 
         else:
 
