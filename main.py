@@ -15,6 +15,7 @@ from screens.relatorios import Relatorios
 from utils import config
 from utils import tema
 from utils import atualizacao
+from utils import autoatualizador
 
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("blue")
@@ -71,23 +72,41 @@ class LosManager(ctk.CTk):
 
         atualizacao.verificar_silenciosamente(self._notificar_atualizacao)
 
-    def _notificar_atualizacao(self, versao_atual, versao_nova, url_release):
+    def _notificar_atualizacao(self, versao_atual, versao_nova, url_release, url_download):
 
         # Chamado de dentro da thread de rede: precisa voltar pra
         # thread principal do Tkinter antes de mexer na interface.
-        self.after(0, lambda: self._mostrar_aviso_atualizacao(versao_atual, versao_nova, url_release))
+        self.after(0, lambda: self._mostrar_aviso_atualizacao(versao_atual, versao_nova, url_release, url_download))
 
-    def _mostrar_aviso_atualizacao(self, versao_atual, versao_nova, url_release):
+    def _mostrar_aviso_atualizacao(self, versao_atual, versao_nova, url_release, url_download):
 
-        abrir = messagebox.askyesno(
+        # Sem um .zip anexado ao release não tem o que baixar/instalar
+        # sozinho — cai pro fluxo antigo de abrir a página no navegador.
+        if not url_download:
+
+            abrir = messagebox.askyesno(
+                "Atualização disponível",
+                f"Você está usando a versão {atualizacao.formatar_versao(versao_atual)}.\n"
+                f"A versão {atualizacao.formatar_versao(versao_nova)} já está disponível no GitHub.\n\n"
+                "Não foi possível encontrar o arquivo de instalação automática "
+                "nesse release. Deseja abrir a página de download agora?"
+            )
+
+            if abrir:
+                webbrowser.open(url_release)
+
+            return
+
+        atualizar = messagebox.askyesno(
             "Atualização disponível",
             f"Você está usando a versão {atualizacao.formatar_versao(versao_atual)}.\n"
-            f"A versão {atualizacao.formatar_versao(versao_nova)} já está disponível no GitHub.\n\n"
-            "Deseja abrir a página de download agora?"
+            f"A versão {atualizacao.formatar_versao(versao_nova)} já está disponível.\n\n"
+            "Deseja atualizar agora? O programa vai baixar a nova versão, "
+            "fechar e abrir de novo sozinho."
         )
 
-        if abrir:
-            webbrowser.open(url_release)
+        if atualizar:
+            autoatualizador.iniciar(self, url_download)
 
     # ==================================================
 
