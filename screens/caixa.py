@@ -3,6 +3,7 @@ from tkinter import messagebox
 from datetime import datetime
 
 from database.conexao import banco
+from utils import caixa_estado
 
 
 class Caixa(ctk.CTkFrame):
@@ -55,9 +56,9 @@ class Caixa(ctk.CTkFrame):
 
     def buscar_caixa_aberto(self):
 
-        return banco.buscar_um(
-            "SELECT * FROM caixa WHERE status='Aberto' ORDER BY id DESC LIMIT 1"
-        )
+        # Mesma consulta que o menu do main.py e a tela de Pedidos usam
+        # para saber se podem liberar o sistema — uma fonte só.
+        return caixa_estado.buscar_caixa_aberto()
 
     # ======================================================
     # TELA: SEM CAIXA ABERTO
@@ -78,6 +79,13 @@ class Caixa(ctk.CTkFrame):
             bloco,
             text="Nenhum caixa aberto no momento",
             font=("Arial", 20, "bold")
+        ).pack(pady=(0, 10))
+
+        ctk.CTkLabel(
+            bloco,
+            text="O restante do sistema fica bloqueado até o caixa ser aberto.",
+            font=("Arial", 13),
+            wraplength=400
         ).pack(pady=(0, 20))
 
         ctk.CTkLabel(

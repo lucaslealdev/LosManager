@@ -16,6 +16,7 @@ from utils import config
 from utils import tema
 from utils import atualizacao
 from utils import autoatualizador
+from utils import caixa_estado
 
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("blue")
@@ -181,11 +182,30 @@ class LosManager(ctk.CTk):
             pady=15
         )
 
-        self.navegar("dashboard", self.abrir_dashboard)
+        # Sem caixa aberto o sistema começa travado na tela de Caixa —
+        # ver `navegar()`.
+        if caixa_estado.esta_aberto():
+            self.navegar("dashboard", self.abrir_dashboard)
+        else:
+            self.navegar("caixa", self.abrir_caixa)
 
     # ==================================================
 
     def navegar(self, chave, comando):
+
+        # Enquanto não tiver caixa aberto, a única tela liberada é a de
+        # Caixa: nada de cadastrar, vender ou consultar relatório com o
+        # caixa fechado (o movimento do dia não teria onde entrar).
+        if chave != "caixa" and not caixa_estado.esta_aberto():
+
+            messagebox.showwarning(
+                "Caixa fechado",
+                "Nenhum caixa aberto no momento.\n\n"
+                "Abra o caixa para liberar o restante do sistema."
+            )
+
+            chave = "caixa"
+            comando = self.abrir_caixa
 
         for k, botao in self.botoes.items():
 

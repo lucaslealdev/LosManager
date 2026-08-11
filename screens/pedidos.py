@@ -7,6 +7,7 @@ from utils import impressora
 from utils import config
 from utils import busca
 from utils import responsivo
+from utils import caixa_estado
 
 
 class Pedidos(ctk.CTkFrame):
@@ -898,6 +899,19 @@ class Pedidos(ctk.CTkFrame):
     # ======================================================
 
     def finalizar(self):
+
+        # Trava também aqui, não só no menu: se o caixa for fechado com
+        # a tela de Pedidos já aberta, a venda não pode ser gravada —
+        # ela entraria num dia/caixa que não está mais aberto.
+        if not caixa_estado.esta_aberto():
+
+            messagebox.showwarning(
+                "Caixa fechado",
+                "Nenhum caixa aberto no momento.\n\n"
+                "Abra o caixa antes de finalizar pedidos."
+            )
+
+            return
 
         if len(self.itens) == 0:
 
