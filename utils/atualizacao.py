@@ -17,10 +17,36 @@ import sys
 import json
 import threading
 import urllib.request
+import urllib.error
 
 from utils import config
 
 REPOSITORIO_PADRAO = "ramonxxl/LosManager"
+
+# Chave onde fica guardado o último repositório inválido já avisado —
+# ver `ja_avisou_repositorio()`.
+CHAVE_AVISO_REPO = "aviso_repo_invalido"
+
+
+class RepositorioInvalido(Exception):
+    """O repositório configurado não existe, está privado ou não tem
+    nenhuma release publicada (a API devolve 404 nos três casos).
+
+    Separado das falhas de rede de propósito: ficar sem internet é
+    temporário e não vale incomodar o usuário, mas um repositório errado
+    NUNCA vai se resolver sozinho — o programa ficaria mudo pra sempre
+    achando que está atualizado. Aconteceu na loja: o campo estava com
+    "ramonxx/losmanager" (faltando o "l" do usuário), a consulta dava 404
+    e nenhuma atualização era oferecida, sem nenhum sinal de erro."""
+
+    def __init__(self, repositorio):
+
+        self.repositorio = repositorio
+
+        super().__init__(
+            f"repositório \"{repositorio}\" não encontrado no GitHub "
+            "(inexistente, privado ou sem releases publicadas)"
+        )
 
 
 def _repositorio():
@@ -111,8 +137,18 @@ def _consultar_release_mais_recente():
         headers={"Accept": "application/vnd.github+json"}
     )
 
-    with urllib.request.urlopen(requisicao, timeout=6) as resposta:
-        dados = json.loads(resposta.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(requisicao, timeout=6) as resposta:
+            dados = json.loads(resposta.read().decode("utf-8"))
+
+    except urllib.error.HTTPError as erro:
+
+        # 404 é o único caso que dá pra afirmar que o problema é a
+        # configuração, e não a rede.
+        if erro.code == 404:
+            raise RepositorioInvalido(_repositorio()) from erro
+
+        raise
 
     versao_remota = _parsear_versao(dados.get("tag_name", ""))
     url_release = dados.get("html_url") or _url_pagina_releases()
@@ -121,13 +157,32 @@ def _consultar_release_mais_recente():
     return versao_remota, url_release, url_download
 
 
-def verificar_silenciosamente(ao_encontrar_atualizacao):
+def ja_avisou_repositorio(repositorio):
+    """Se o usuário já foi avisado de que ESTE repositório não responde.
+    Guardar o nome (e não um simples "já avisei") faz o aviso voltar
+    sozinho se alguém trocar o campo por outro valor também errado."""
+
+    return config.obter(CHAVE_AVISO_REPO, "") == repositorio
+
+
+def marcar_aviso_repositorio(repositorio):
+    """Chamar da thread principal (é uma escrita no banco), depois de
+    mostrar o aviso, pra ele não se repetir a cada abertura."""
+
+    config.definir(CHAVE_AVISO_REPO, repositorio)
+
+
+def verificar_silenciosamente(ao_encontrar_atualizacao, ao_repositorio_invalido=None):
     """Uso automático (chamado uma vez ao abrir o app): roda em thread
     separada e só chama `ao_encontrar_atualizacao(versao_atual,
     versao_nova, url_release, url_download)` se realmente houver uma
-    versão mais nova. Qualquer erro de rede é ignorado silenciosamente —
-    não é pra incomodar o usuário toda vez que abrir o programa sem
-    internet — e rodando direto do código-fonte não faz a checagem."""
+    versão mais nova. Erro de rede é ignorado silenciosamente — não é pra
+    incomodar o usuário toda vez que abrir o programa sem internet — e
+    rodando direto do código-fonte não faz a checagem.
+
+    A exceção é o repositório inválido (404): esse chama
+    `ao_repositorio_invalido(repositorio)`, uma única vez por valor
+    configurado, porque é problema de configuração e não passa sozinho."""
 
     if not getattr(sys, "frozen", False):
         return
@@ -141,6 +196,14 @@ def verificar_silenciosamente(ao_encontrar_atualizacao):
 
         try:
             versao_remota, url_release, url_download = _consultar_release_mais_recente()
+
+        except RepositorioInvalido as erro:
+
+            if ao_repositorio_invalido and not ja_avisou_repositorio(erro.repositorio):
+                ao_repositorio_invalido(erro.repositorio)
+
+            return
+
         except Exception:
             return
 

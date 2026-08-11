@@ -519,6 +519,23 @@ class Configuracoes(ctk.CTkFrame):
 
         self.lbl_status.configure(text="")
 
+        # Repositório errado e falta de internet dão a mesma cara de
+        # "não deu certo", mas o conserto é bem diferente — o primeiro
+        # está a dois campos de distância, nesta mesma tela.
+        if isinstance(erro, atualizacao.RepositorioInvalido):
+
+            messagebox.showerror(
+                "Verificar Atualização",
+                f"Não foi possível encontrar o repositório \"{erro.repositorio}\" "
+                "no GitHub.\n\n"
+                "Ele pode estar escrito errado, ser privado ou não ter nenhuma "
+                "versão publicada. Corrija o campo \"Repositório no GitHub\" "
+                f"aqui em cima — o padrão é {atualizacao.REPOSITORIO_PADRAO} — "
+                "e salve antes de tentar de novo."
+            )
+
+            return
+
         messagebox.showerror(
             "Verificar Atualização",
             f"Não foi possível verificar atualizações agora:\n\n{erro}\n\n"

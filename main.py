@@ -71,13 +71,40 @@ class LosManager(ctk.CTk):
         se já estiver atualizado, sem internet, ou rodando via `python
         main.py`) — ver utils/atualizacao.py."""
 
-        atualizacao.verificar_silenciosamente(self._notificar_atualizacao)
+        atualizacao.verificar_silenciosamente(
+            self._notificar_atualizacao,
+            self._notificar_repositorio_invalido
+        )
 
     def _notificar_atualizacao(self, versao_atual, versao_nova, url_release, url_download):
 
         # Chamado de dentro da thread de rede: precisa voltar pra
         # thread principal do Tkinter antes de mexer na interface.
         self.after(0, lambda: self._mostrar_aviso_atualizacao(versao_atual, versao_nova, url_release, url_download))
+
+    def _notificar_repositorio_invalido(self, repositorio):
+
+        self.after(0, lambda: self._mostrar_aviso_repositorio(repositorio))
+
+    def _mostrar_aviso_repositorio(self, repositorio):
+        """Repositório errado nas Configurações: diferente de ficar sem
+        internet, isso não se resolve sozinho — sem avisar, o programa
+        nunca mais oferece atualização e ninguém descobre por quê."""
+
+        # Marca ANTES de mostrar: o aviso é uma vez por valor configurado,
+        # senão vira incômodo em toda abertura.
+        atualizacao.marcar_aviso_repositorio(repositorio)
+
+        messagebox.showwarning(
+            "Atualização automática",
+            f"Não consegui consultar o repositório \"{repositorio}\" no GitHub.\n\n"
+            "Ele pode estar escrito errado, ser privado ou não ter nenhuma "
+            "versão publicada. Confira o campo \"Repositório no GitHub\" em "
+            "Configurações — o padrão é "
+            f"{atualizacao.REPOSITORIO_PADRAO}.\n\n"
+            "Enquanto isso, o programa não vai avisar quando sair uma "
+            "versão nova."
+        )
 
     def _mostrar_aviso_atualizacao(self, versao_atual, versao_nova, url_release, url_download):
 
