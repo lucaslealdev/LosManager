@@ -138,7 +138,9 @@ def _consultar_release_mais_recente():
     )
 
     try:
-        with urllib.request.urlopen(requisicao, timeout=6) as resposta:
+        # 15s (e não 6): numa conexão lenta como a da loja, um timeout
+        # curto fazia a verificação automática sumir sem dizer nada.
+        with urllib.request.urlopen(requisicao, timeout=15) as resposta:
             dados = json.loads(resposta.read().decode("utf-8"))
 
     except urllib.error.HTTPError as erro:

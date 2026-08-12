@@ -38,11 +38,17 @@ class LosManager(ctk.CTk):
 
         self.fazer_backup_inicial()
 
-        self.verificar_atualizacao()
-
         self.definir_icone()
 
         self.criar_interface()
+
+        # Só depois da janela estar montada e do loop de eventos rodando —
+        # e com uma folga de 2s. Consultar o GitHub no meio da inicialização
+        # dava atualização que nunca aparecia: num PC recém-ligado a rede
+        # ainda não subiu nesses primeiros segundos, a consulta falhava e o
+        # erro é engolido de propósito, sem segunda chance. Foi o que
+        # aconteceu na loja.
+        self.after(2000, self.verificar_atualizacao)
 
     # ==================================================
 
