@@ -127,12 +127,33 @@ def _imprimir_resumo(resultado, stream, usar_cor, duracao):
     stream.write("\n" + "-" * 70 + "\n" + linha + "\n")
 
 
+def _garantir_utf8(stream):
+    """O console do Windows às vezes usa um codepage antigo (cp1252)
+    que não sabe codificar ✓/✗/○ — sem isso, a suíte quebra com
+    UnicodeEncodeError bem no meio do primeiro teste (foi exatamente
+    o que aconteceu na Action, que roda em windows-latest). Força
+    UTF-8 na saída quando o stream permitir; streams que não suportam
+    `reconfigure` (ex: um StringIO de teste) já são texto puro e não
+    têm esse problema, então seguem sem alteração."""
+
+    reconfigure = getattr(stream, "reconfigure", None)
+
+    if reconfigure is None:
+        return
+
+    try:
+        reconfigure(encoding="utf-8", errors="backslashreplace")
+    except (ValueError, OSError):
+        pass
+
+
 def rodar(suite, stream=None):
     """Roda `suite` com a saída amigável (agrupada por classe, com
     descrição em vez do nome técnico) e devolve um `unittest.TestResult`
     normal — `.wasSuccessful()` funciona igual ao runner padrão."""
 
     stream = stream or sys.stdout
+    _garantir_utf8(stream)
     usar_cor = hasattr(stream, "isatty") and stream.isatty()
 
     resultado = _ResultadoAmigavel(stream, usar_cor)
