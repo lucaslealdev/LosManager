@@ -107,7 +107,12 @@ def _obter_display_xvfb():
     display = f":{numero_display}"
 
     _xvfb["processo"] = subprocess.Popen(
-        ["Xvfb", display, "-screen", "0", "1366x768x24"],
+        # Mais alto que o 1366x768 do PC da loja de propósito: alguns
+        # testes de GUI (ex: test_tela_produtos_responsividade.py)
+        # precisam conseguir pedir uma janela bem mais alta que 768px
+        # pra provar a diferença de linhas, e um display virtual do
+        # tamanho exato da loja não deixa espaço pra isso.
+        ["Xvfb", display, "-screen", "0", "1366x1400x24"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL
     )

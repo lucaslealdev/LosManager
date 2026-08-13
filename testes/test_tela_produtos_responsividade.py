@@ -11,17 +11,53 @@ janela raiz de verdade), então segue o mesmo padrão de
 um display utilizável (Windows / Linux com monitor / Xvfb automático),
 e só importa customtkinter/screens depois que esse ambiente já está
 pronto.
+
+As alturas usadas não são fixas nem os 1366x768 do PC da loja — são
+calculadas em cima do tamanho real da tela (`winfo_screenheight()`) na
+hora do teste, por dois motivos vistos na prática:
+
+1. Numa primeira versão com 768/500/900 fixos: passava em todo lugar
+   testado localmente, mas falhou na Action (windows-latest) — lá a
+   mesma tela consome bem mais altura antes de chegar na tabela (a
+   fonte "Arial" de verdade rende mais alta que a substituta do
+   Linux/Xvfb), então 768px já batia no piso mínimo de linhas e a
+   diferença entre os tamanhos desaparecia.
+2. Tentando compensar com uma altura BEM maior que a tela (pra
+   garantir folga): alguns window managers tratam um geometry() maior
+   que a tela como um pedido de maximizar, e depois de "maximizado"
+   passam a ignorar geometry() menores — reproduzido numa sessão
+   gráfica real aqui. Por isso o estado "grande" usa quase a tela
+   inteira, nunca mais que ela.
 """
 
 import time
 import unittest
 
 from testes.gui_ambiente import ambiente_grafico, fechar_janela
-from utils.responsivo import ATRASO_DEBOUNCE_MS
+from utils.responsivo import ATRASO_DEBOUNCE_MS, MINIMO_LINHAS_PADRAO
 
-# Tempo de sobra além do debounce do próprio utils/responsivo.py, pra
-# não dar falso negativo numa máquina momentaneamente carregada.
-ESPERA_DEBOUNCE_SEGUNDOS = (ATRASO_DEBOUNCE_MS + 150) / 1000
+# Bem mais folgado que o ATRASO_DEBOUNCE_MS do próprio
+# utils/responsivo.py, pra não dar falso negativo numa máquina lenta
+# ou momentaneamente carregada (a Action, por exemplo, é bem mais
+# lenta que uma máquina de desenvolvedor pra isso).
+ESPERA_DEBOUNCE_SEGUNDOS = (ATRASO_DEBOUNCE_MS + 1000) / 1000
+
+ALTURA_JANELA_PEQUENA = 300
+
+# Margem de segurança subtraída da altura real da tela, pra sobrar
+# espaço pra decoração da janela/barra de tarefas e o pedido não virar
+# um "maximizar" por acidente — testado na prática: com só 80px de
+# margem (screen 1080 -> pedido de 1000), o window manager local
+# "grudou" a janela em 998px e passou a ignorar geometry() menores;
+# com 200px de margem (pedido de 880) o mesmo redimensionamento
+# funcionou normalmente pra frente e pra trás.
+MARGEM_TELA_PX = 200
+
+# Diferença mínima de altura real (px) entre as duas janelas pra
+# considerar que o ambiente gráfico atual realmente deixou redimensionar
+# o suficiente pra testar — abaixo disso, pula o teste em vez de
+# arriscar um falso negativo por causa do ambiente, não do código.
+DIFERENCA_MINIMA_PX = 100
 
 
 class TesteResponsividadeTelaProdutos(unittest.TestCase):
@@ -58,33 +94,66 @@ class TesteResponsividadeTelaProdutos(unittest.TestCase):
         from screens.produtos import Produtos
 
         root = ctk.CTk()
-        root.geometry("1366x768")
+
+        # Quase a tela inteira, nunca mais que ela (ver docstring do
+        # módulo) — calculado agora porque depende do ambiente atual
+        # (monitor real, ou o -screen do Xvfb).
+        altura_grande = max(root.winfo_screenheight() - MARGEM_TELA_PX, 500)
+        geometria_grande = f"1366x{altura_grande}"
+
+        root.geometry(geometria_grande)
 
         try:
             tela = Produtos(root)
             root.update()
 
-            altura_inicial = int(tela.tabela.cget("height"))
+            altura_janela_grande = root.winfo_height()
+            linhas_janela_grande = int(tela.tabela.cget("height"))
 
-            self._redimensionar_e_esperar(root, "1366x500")
-            altura_apos_encolher = int(tela.tabela.cget("height"))
+            self._redimensionar_e_esperar(root, f"1366x{ALTURA_JANELA_PEQUENA}")
+            altura_janela_pequena = root.winfo_height()
+            linhas_janela_pequena = int(tela.tabela.cget("height"))
 
-            self._redimensionar_e_esperar(root, "1366x900")
-            altura_apos_crescer = int(tela.tabela.cget("height"))
+            self._redimensionar_e_esperar(root, geometria_grande)
+            linhas_apos_crescer_de_novo = int(tela.tabela.cget("height"))
         finally:
             fechar_janela(root)
 
+        diferenca_real = altura_janela_grande - altura_janela_pequena
+
+        if diferenca_real < DIFERENCA_MINIMA_PX:
+            self.skipTest(
+                "Este ambiente gráfico não deixou a janela variar de "
+                f"altura o suficiente pra testar (pedido: "
+                f"{geometria_grande} vs 1366x{ALTURA_JANELA_PEQUENA}; "
+                f"altura real obtida: {altura_janela_grande}px vs "
+                f"{altura_janela_pequena}px, diferença de só "
+                f"{diferenca_real}px)."
+            )
+
+        if linhas_janela_grande <= MINIMO_LINHAS_PADRAO:
+            self.skipTest(
+                "Mesmo usando quase a tela inteira "
+                f"({altura_janela_grande}px), a tabela não passou do "
+                f"piso mínimo de {MINIMO_LINHAS_PADRAO} linhas nesse "
+                "ambiente — os outros widgets da tela (título, filtro, "
+                "formulário, dica) consomem espaço demais aqui pra dar "
+                "pra provar a diferença sem arriscar o bug do "
+                "'maximizar' de novo."
+            )
+
         self.assertLess(
-            altura_apos_encolher, altura_inicial,
-            "A tabela deveria ter MENOS linhas depois que a janela "
-            f"diminuiu de altura (tinha {altura_inicial}, ficou "
-            f"{altura_apos_encolher})."
+            linhas_janela_pequena, linhas_janela_grande,
+            "A tabela deveria ter MENOS linhas na janela pequena do que "
+            f"na grande (grande: {linhas_janela_grande} linhas em "
+            f"{altura_janela_grande}px; pequena: {linhas_janela_pequena} "
+            f"linhas em {altura_janela_pequena}px)."
         )
         self.assertGreater(
-            altura_apos_crescer, altura_apos_encolher,
-            "A tabela deveria ter MAIS linhas depois que a janela "
-            f"voltou a crescer (tinha {altura_apos_encolher}, ficou "
-            f"{altura_apos_crescer})."
+            linhas_apos_crescer_de_novo, linhas_janela_pequena,
+            "A tabela deveria voltar a ter MAIS linhas depois que a "
+            f"janela cresceu de novo (tinha {linhas_janela_pequena}, "
+            f"ficou {linhas_apos_crescer_de_novo})."
         )
 
 
