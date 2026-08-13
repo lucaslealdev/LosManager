@@ -27,6 +27,14 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Rodar a suíte de testes
+        # Roda antes de gerar o executável de propósito: se algo quebrou,
+        # a build para aqui e nem chega a compilar/publicar um release
+        # ruim. windows-latest tem sessão gráfica própria, então
+        # testes/gui_ambiente.py não precisa de Xvfb aqui (só entra em
+        # jogo num Linux sem monitor).
+        run: python -m testes
+
       - name: Calcular a versão semântica desta build
         # MAJOR.MINOR vêm do arquivo VERSION (versionado no repositório,
         # ajustado à mão quando uma mudança realmente merece um novo
