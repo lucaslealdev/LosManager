@@ -101,36 +101,44 @@ jobs:
           }
           "@
 
-          # O driver de vídeo genérico da VM só aceita os modos que ele
-          # mesmo enumera (uma resolução "arbitrária" foi recusada com
-          # -2/DISP_CHANGE_BADMODE numa tentativa anterior) — então lista
-          # todos os modos suportados e escolhe o de maior altura.
-          $melhorModo = $null
-          $numeroModo = 0
+          # O driver de vídeo virtual da VM não suporta enumerar seus
+          # modos (EnumDisplaySettings devolveu zero modos numa
+          # tentativa anterior, e uma resolução arbitrária -- 1366x2000
+          # -- foi recusada com -2/DISP_CHANGE_BADMODE numa tentativa
+          # antes dessa). Em vez de enumerar, tenta uma lista de
+          # resoluções padrão comuns, da mais alta pra mais baixa, e
+          # fica com a primeira que o driver aceitar.
+          $candidatas = @(
+              @{L=1920; A=1200}, @{L=1600; A=1200}, @{L=1920; A=1080},
+              @{L=1680; A=1050}, @{L=1600; A=900},  @{L=1440; A=900},
+              @{L=1366; A=1024}, @{L=1280; A=1024}, @{L=1280; A=960}
+          )
 
-          while ($true) {
+          $conseguiu = $false
+
+          foreach ($c in $candidatas) {
               $dm = [Resolucao]::NovoDevMode()
-              if ([Resolucao]::EnumDisplaySettings($null, $numeroModo, [ref]$dm) -eq 0) {
+
+              if ([Resolucao]::EnumDisplaySettings($null, -1, [ref]$dm) -eq 0) {
+                  Write-Host "EnumDisplaySettings(ENUM_CURRENT_SETTINGS) falhou -- desistindo."
                   break
               }
 
-              if ($melhorModo -eq $null -or $dm.dmPelsHeight -gt $melhorModo.dmPelsHeight) {
-                  $melhorModo = $dm
-              }
+              $dm.dmPelsWidth = $c.L
+              $dm.dmPelsHeight = $c.A
+              $dm.dmFields = [Resolucao]::DM_PELSWIDTH -bor [Resolucao]::DM_PELSHEIGHT
 
-              $numeroModo++
+              $resultado = [Resolucao]::ChangeDisplaySettings([ref]$dm, 0)
+              Write-Host "Tentando $($c.L)x$($c.A) -> resultado $resultado (0 = sucesso)"
+
+              if ($resultado -eq 0) {
+                  $conseguiu = $true
+                  break
+              }
           }
 
-          Write-Host "Modos de vídeo suportados pela VM: $numeroModo"
-
-          if ($melhorModo -ne $null) {
-              Write-Host "Maior modo encontrado: $($melhorModo.dmPelsWidth)x$($melhorModo.dmPelsHeight)"
-
-              $melhorModo.dmFields = [Resolucao]::DM_PELSWIDTH -bor [Resolucao]::DM_PELSHEIGHT
-              $resultado = [Resolucao]::ChangeDisplaySettings([ref]$melhorModo, 0)
-              Write-Host "Resultado da troca de resolução (0 = sucesso): $resultado"
-          } else {
-              Write-Host "Nenhum modo de vídeo enumerado pela VM -- seguindo com a resolução padrão."
+          if (-not $conseguiu) {
+              Write-Host "Nenhuma resolução candidata foi aceita -- seguindo com a resolução padrão da VM."
           }
         continue-on-error: true
 
