@@ -37,6 +37,19 @@ folga numa tela pequena; bastante margem pra não travar num monitor
 real), o teste tenta as duas em sequência e usa a primeira que
 funcionar, em vez de arriscar acertar uma única margem pra todo
 ambiente possível.
+
+Mesmo assim, na Action (windows-latest) este teste É PULADO — dado
+real confirmado rodando lá: a tela do runner é fixa em ~768px de
+altura, e mesmo pedindo quase ela inteira (738px, margem=30) a tabela
+não passa do piso mínimo de linhas (a fonte "Arial" de verdade come
+espaço demais). Não tem geometry() que resolva isso — o teto é o
+próprio tamanho físico da tela do runner, não o pedido feito ao Tk.
+Um pulo aqui é esperado e não bloqueia o build (skip ≠ falha); a
+cobertura de verdade desse comportamento acontece em Linux (com
+monitor real ou via Xvfb, cujo -screen dá pra deixar bem mais alto —
+ver testes/gui_ambiente.py). Aumentar a resolução real do runner
+Windows via PowerShell antes dos testes resolveria isso, mas não foi
+implementado — custo/risco não pareceu valer a pena frente ao ganho.
 """
 
 import time
