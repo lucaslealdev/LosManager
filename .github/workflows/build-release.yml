@@ -27,6 +27,95 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Aumentar a resolução da tela virtual do runner
+        # windows-latest não tem monitor físico, então roda com uma
+        # resolução padrão bem baixa (~1024x768) — pequena demais pro
+        # teste de responsividade da tabela (screens/produtos.py)
+        # conseguir provar diferença de linhas numa janela grande vs
+        # pequena (ver testes/test_tela_produtos_responsividade.py).
+        # Troca a resolução via ChangeDisplaySettings (Win32) antes dos
+        # testes rodarem; se o driver de vídeo da VM recusar a troca,
+        # só avisa no log e segue (o teste em questão já sabe se
+        # proteger com um skip nesse caso, não falha o build).
+        run: |
+          Add-Type -TypeDefinition @"
+          using System;
+          using System.Runtime.InteropServices;
+
+          public class Resolucao
+          {
+              [StructLayout(LayoutKind.Sequential)]
+              private struct DEVMODE
+              {
+                  [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+                  public string dmDeviceName;
+                  public short dmSpecVersion;
+                  public short dmDriverVersion;
+                  public short dmSize;
+                  public short dmDriverExtra;
+                  public int dmFields;
+                  public int dmPositionX;
+                  public int dmPositionY;
+                  public int dmDisplayOrientation;
+                  public int dmDisplayFixedOutput;
+                  public short dmColor;
+                  public short dmDuplex;
+                  public short dmYResolution;
+                  public short dmTTOption;
+                  public short dmCollate;
+                  [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+                  public string dmFormName;
+                  public short dmLogPixels;
+                  public int dmBitsPerPel;
+                  public int dmPelsWidth;
+                  public int dmPelsHeight;
+                  public int dmDisplayFlags;
+                  public int dmDisplayFrequency;
+                  public int dmICMMethod;
+                  public int dmICMIntent;
+                  public int dmMediaType;
+                  public int dmDitherType;
+                  public int dmReserved1;
+                  public int dmReserved2;
+                  public int dmPanningWidth;
+                  public int dmPanningHeight;
+              }
+
+              [DllImport("user32.dll")]
+              private static extern int EnumDisplaySettings(string deviceName, int modeNum, ref DEVMODE devMode);
+
+              [DllImport("user32.dll")]
+              private static extern int ChangeDisplaySettings(ref DEVMODE devMode, int flags);
+
+              private const int ENUM_CURRENT_SETTINGS = -1;
+              private const int DM_PELSWIDTH = 0x80000;
+              private const int DM_PELSHEIGHT = 0x100000;
+
+              public static int Trocar(int largura, int altura)
+              {
+                  DEVMODE dm = new DEVMODE();
+                  dm.dmDeviceName = new string(new char[32]);
+                  dm.dmFormName = new string(new char[32]);
+                  dm.dmSize = (short)Marshal.SizeOf(dm);
+
+                  if (EnumDisplaySettings(null, ENUM_CURRENT_SETTINGS, ref dm) == 0)
+                  {
+                      return -100;
+                  }
+
+                  dm.dmPelsWidth = largura;
+                  dm.dmPelsHeight = altura;
+                  dm.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT;
+
+                  return ChangeDisplaySettings(ref dm, 0);
+              }
+          }
+          "@
+
+          $resultado = [Resolucao]::Trocar(1366, 2000)
+          Write-Host "Resultado da troca de resolução (0 = sucesso): $resultado"
+        continue-on-error: true
+
       - name: Rodar a suíte de testes
         # Roda antes de gerar o executável de propósito: se algo quebrou,
         # a build para aqui e nem chega a compilar/publicar um release
