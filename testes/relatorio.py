@@ -134,7 +134,12 @@ def _garantir_utf8(stream):
     o que aconteceu na Action, que roda em windows-latest). Força
     UTF-8 na saída quando o stream permitir; streams que não suportam
     `reconfigure` (ex: um StringIO de teste) já são texto puro e não
-    têm esse problema, então seguem sem alteração."""
+    têm esse problema, então seguem sem alteração.
+
+    De quebra, força `line_buffering` também: um stdout redirecionado
+    pra um arquivo/pipe (como o da Action) normalmente usa buffer de
+    bloco, então sem isso a saída só aparece toda de uma vez no fim —
+    ou nem aparece, se o processo travar/for morto no meio."""
 
     reconfigure = getattr(stream, "reconfigure", None)
 
@@ -142,7 +147,7 @@ def _garantir_utf8(stream):
         return
 
     try:
-        reconfigure(encoding="utf-8", errors="backslashreplace")
+        reconfigure(encoding="utf-8", errors="backslashreplace", line_buffering=True)
     except (ValueError, OSError):
         pass
 
