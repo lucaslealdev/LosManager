@@ -82,38 +82,56 @@ jobs:
               }
 
               [DllImport("user32.dll")]
-              private static extern int EnumDisplaySettings(string deviceName, int modeNum, ref DEVMODE devMode);
+              public static extern int EnumDisplaySettings(string deviceName, int modeNum, ref DEVMODE devMode);
 
               [DllImport("user32.dll")]
-              private static extern int ChangeDisplaySettings(ref DEVMODE devMode, int flags);
+              public static extern int ChangeDisplaySettings(ref DEVMODE devMode, int flags);
 
-              private const int ENUM_CURRENT_SETTINGS = -1;
-              private const int DM_PELSWIDTH = 0x80000;
-              private const int DM_PELSHEIGHT = 0x100000;
-
-              public static int Trocar(int largura, int altura)
+              public static DEVMODE NovoDevMode()
               {
                   DEVMODE dm = new DEVMODE();
                   dm.dmDeviceName = new string(new char[32]);
                   dm.dmFormName = new string(new char[32]);
                   dm.dmSize = (short)Marshal.SizeOf(dm);
-
-                  if (EnumDisplaySettings(null, ENUM_CURRENT_SETTINGS, ref dm) == 0)
-                  {
-                      return -100;
-                  }
-
-                  dm.dmPelsWidth = largura;
-                  dm.dmPelsHeight = altura;
-                  dm.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT;
-
-                  return ChangeDisplaySettings(ref dm, 0);
+                  return dm;
               }
+
+              public const int DM_PELSWIDTH = 0x80000;
+              public const int DM_PELSHEIGHT = 0x100000;
           }
           "@
 
-          $resultado = [Resolucao]::Trocar(1366, 2000)
-          Write-Host "Resultado da troca de resolução (0 = sucesso): $resultado"
+          # O driver de vídeo genérico da VM só aceita os modos que ele
+          # mesmo enumera (uma resolução "arbitrária" foi recusada com
+          # -2/DISP_CHANGE_BADMODE numa tentativa anterior) — então lista
+          # todos os modos suportados e escolhe o de maior altura.
+          $melhorModo = $null
+          $numeroModo = 0
+
+          while ($true) {
+              $dm = [Resolucao]::NovoDevMode()
+              if ([Resolucao]::EnumDisplaySettings($null, $numeroModo, [ref]$dm) -eq 0) {
+                  break
+              }
+
+              if ($melhorModo -eq $null -or $dm.dmPelsHeight -gt $melhorModo.dmPelsHeight) {
+                  $melhorModo = $dm
+              }
+
+              $numeroModo++
+          }
+
+          Write-Host "Modos de vídeo suportados pela VM: $numeroModo"
+
+          if ($melhorModo -ne $null) {
+              Write-Host "Maior modo encontrado: $($melhorModo.dmPelsWidth)x$($melhorModo.dmPelsHeight)"
+
+              $melhorModo.dmFields = [Resolucao]::DM_PELSWIDTH -bor [Resolucao]::DM_PELSHEIGHT
+              $resultado = [Resolucao]::ChangeDisplaySettings([ref]$melhorModo, 0)
+              Write-Host "Resultado da troca de resolução (0 = sucesso): $resultado"
+          } else {
+              Write-Host "Nenhum modo de vídeo enumerado pela VM -- seguindo com a resolução padrão."
+          }
         continue-on-error: true
 
       - name: Rodar a suíte de testes
