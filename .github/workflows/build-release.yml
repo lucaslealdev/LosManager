@@ -45,7 +45,7 @@ jobs:
           public class Resolucao
           {
               [StructLayout(LayoutKind.Sequential)]
-              private struct DEVMODE
+              public struct DEVMODE
               {
                   [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
                   public string dmDeviceName;
