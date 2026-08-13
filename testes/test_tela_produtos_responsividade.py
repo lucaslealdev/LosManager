@@ -47,9 +47,15 @@ próprio tamanho físico da tela do runner, não o pedido feito ao Tk.
 Um pulo aqui é esperado e não bloqueia o build (skip ≠ falha); a
 cobertura de verdade desse comportamento acontece em Linux (com
 monitor real ou via Xvfb, cujo -screen dá pra deixar bem mais alto —
-ver testes/gui_ambiente.py). Aumentar a resolução real do runner
-Windows via PowerShell antes dos testes resolveria isso, mas não foi
-implementado — custo/risco não pareceu valer a pena frente ao ganho.
+ver testes/gui_ambiente.py). Chegou a se tentar aumentar a resolução
+real do runner Windows via PowerShell (ChangeDisplaySettings/
+EnumDisplaySettings, Win32) antes dos testes, mas o driver de vídeo
+virtual desse runner não implementa essa API — nem consultar a
+configuração ATUAL (ENUM_CURRENT_SETTINGS, que funciona em qualquer
+sessão Windows normal) funcionou. Não é um bug corrigível do lado de
+quem chama a API — é uma limitação real desse adaptador de vídeo
+específico, então a tentativa foi abandonada (ver histórico do
+`.github/workflows/build-release.yml`).
 """
 
 import time
