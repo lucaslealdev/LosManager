@@ -21,6 +21,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          # Cacheia só o download dos pacotes pip (não o build do
+          # PyInstaller nem o dist/ final) — a chave inclui o hash do
+          # requirements.txt, então muda automaticamente se as
+          # dependências mudarem; nunca reaproveita um pacote
+          # desatualizado. O `pip install pyinstaller` (sem versão fixa
+          # no requirements.txt) também se beneficia, já que o cache é
+          # de pacotes já baixados, não de uma resolução de versão fixa.
+          cache: "pip"
+          cache-dependency-path: requirements.txt
 
       - name: Instalar dependências
         run: |
