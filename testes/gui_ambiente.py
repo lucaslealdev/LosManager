@@ -130,10 +130,26 @@ def fechar_janela(root):
     isso eles disparam depois do destroy, contra widgets que não
     existem mais, e o Tcl imprime "invalid command name" no stderr."""
 
+    # Desativa os bindings de tornar_dinamica ANTES de cancelar os
+    # after() e destruir — senão o próprio destroy() emite <Configure>,
+    # que agenda um novo after() tarde demais pra ser cancelado.
+    for widget in _todos_os_filhos(root):
+        for desativar in getattr(widget, "_responsivo_desativar", []):
+            desativar()
+
     for id_job in root.tk.call("after", "info"):
         root.after_cancel(id_job)
 
     root.destroy()
+
+
+def _todos_os_filhos(widget):
+    """Percorre recursivamente todos os filhos de um widget."""
+    filhos = []
+    for filho in widget.winfo_children():
+        filhos.append(filho)
+        filhos.extend(_todos_os_filhos(filho))
+    return filhos
 
 
 @contextlib.contextmanager
