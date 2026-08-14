@@ -38,24 +38,18 @@ real), o teste tenta as duas em sequência e usa a primeira que
 funcionar, em vez de arriscar acertar uma única margem pra todo
 ambiente possível.
 
-Mesmo assim, na Action (windows-latest) este teste É PULADO — dado
-real confirmado rodando lá: a tela do runner é fixa em ~768px de
-altura, e mesmo pedindo quase ela inteira (738px, margem=30) a tabela
-não passa do piso mínimo de linhas (a fonte "Arial" de verdade come
-espaço demais). Não tem geometry() que resolva isso — o teto é o
-próprio tamanho físico da tela do runner, não o pedido feito ao Tk.
-Um pulo aqui é esperado e não bloqueia o build (skip ≠ falha); a
-cobertura de verdade desse comportamento acontece em Linux (com
-monitor real ou via Xvfb, cujo -screen dá pra deixar bem mais alto —
-ver testes/gui_ambiente.py). Chegou a se tentar aumentar a resolução
-real do runner Windows via PowerShell (ChangeDisplaySettings/
-EnumDisplaySettings, Win32) antes dos testes, mas o driver de vídeo
-virtual desse runner não implementa essa API — nem consultar a
-configuração ATUAL (ENUM_CURRENT_SETTINGS, que funciona em qualquer
-sessão Windows normal) funcionou. Não é um bug corrigível do lado de
-quem chama a API — é uma limitação real desse adaptador de vídeo
-específico, então a tentativa foi abandonada (ver histórico do
-`.github/workflows/build-release.yml`).
+IMPORTANTE: após construir a tela, o teste espera o debounce do
+`tornar_dinamica` antes de ler o `height` inicial da tabela. No Windows
+a fonte "Arial" real consome mais espaço vertical que no Linux/Xvfb,
+fazendo o `linhas_para_tabela` inicial (em `Produtos.__init__`) retornar
+o piso de 4 linhas — mas o recálculo pós-`<Configure>` (que passa pelo
+debounce) corrige pro valor real. Sem essa espera, o teste lia 4 linhas
+tanto na janela grande quanto na pequena e pulava por achar que não
+conseguia escapar do piso, quando na verdade o problema era só timing.
+
+Na Action (`windows-latest`) ainda pode pular, dado que a tela do runner
+é fixa em ~768px e a tabela pode não escapar do piso mesmo com o debounce
+completo — isso é uma limitação da resolução daquele runner, não do teste.
 """
 
 import time
@@ -130,6 +124,14 @@ class TesteResponsividadeTelaProdutos(unittest.TestCase):
 
         try:
             tela = Produtos(root)
+            root.update()
+
+            # Esperar o debounce do tornar_dinamica antes de ler o
+            # height inicial — sem isso, no Windows o cálculo inicial
+            # de linhas_para_tabela retorna o piso (4) porque as fontes
+            # reais consomem mais espaço, e só o recálculo pós-Configure
+            # (que passa pelo debounce) corrige pro valor real.
+            time.sleep(ESPERA_DEBOUNCE_SEGUNDOS)
             root.update()
 
             altura_janela_grande = root.winfo_height()

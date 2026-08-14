@@ -10,7 +10,37 @@ permissions:
   contents: write
 
 jobs:
+  testes-linux:
+    # Roda os testes num Linux com Xvfb (tela virtual de 1366x1400),
+    # onde TODOS os testes de GUI passam de verdade — inclusive os de
+    # responsividade que no windows-latest pulam por causa da tela
+    # pequena (~768px) e da fonte Arial que consome mais espaço.
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Instalar Xvfb e dependências de sistema
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Instalar dependências Python
+        # pywin32 é só pra impressora térmica no Windows — não é
+        # importado por nenhum teste, então não precisa aqui.
+        run: pip install customtkinter Pillow
+
+      - name: Rodar a suíte de testes
+        run: python -m testes
+
   build:
+    needs: testes-linux
     runs-on: windows-latest
 
     steps:
@@ -21,13 +51,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          # Cacheia só o download dos pacotes pip (não o build do
-          # PyInstaller nem o dist/ final) — a chave inclui o hash do
-          # requirements.txt, então muda automaticamente se as
-          # dependências mudarem; nunca reaproveita um pacote
-          # desatualizado. O `pip install pyinstaller` (sem versão fixa
-          # no requirements.txt) também se beneficia, já que o cache é
-          # de pacotes já baixados, não de uma resolução de versão fixa.
           cache: "pip"
           cache-dependency-path: requirements.txt
 
@@ -37,11 +60,10 @@ jobs:
           pip install pyinstaller
 
       - name: Rodar a suíte de testes
-        # Roda antes de gerar o executável de propósito: se algo quebrou,
-        # a build para aqui e nem chega a compilar/publicar um release
-        # ruim. windows-latest tem sessão gráfica própria, então
-        # testes/gui_ambiente.py não precisa de Xvfb aqui (só entra em
-        # jogo num Linux sem monitor).
+        # Roda de novo no Windows pra pegar qualquer problema específico
+        # de plataforma (encoding, caminhos, fontes). Testes de GUI que
+        # dependem de uma tela grande pulam aqui (~768px) mas já foram
+        # cobertos de verdade no job testes-linux acima.
         run: python -m testes
 
       - name: Calcular a versão semântica desta build

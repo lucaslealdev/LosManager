@@ -1,20 +1,32 @@
 # Teste de responsividade da tabela pula no CI do Windows
 
-## Resumo
+## Status: RESOLVIDO (2026-08-13)
 
-`testes/test_tela_produtos_responsividade.py` (que confirma que a tabela de
-Produtos ganha/perde linhas quando a janela é redimensionada — ver
-`utils/responsivo.py`) passa de verdade em qualquer Linux (monitor real ou
-Xvfb), mas **pula** (não falha, não bloqueia o build) toda vez que roda na
-Action, no runner `windows-latest`. Este documento junta o que já foi
-investigado, os dados coletados e as suspeitas sobre a causa, pra quem for
-continuar essa investigação numa máquina Windows de verdade não precisar
-começar do zero.
+O teste passava no Linux mas pulava no Windows (tanto CI quanto desktop
+real com 1920x1080) porque lia o `height` da tabela **antes do debounce
+do `tornar_dinamica`** terminar. No Linux as fontes menores faziam o
+cálculo inicial (`linhas_para_tabela` em `Produtos.__init__`) já retornar
+um valor acima do piso, mascarando o problema. No Windows a fonte "Arial"
+real consome mais espaço vertical, então o cálculo inicial retornava o
+piso (4 linhas), e só o recálculo pós-`<Configure>` (que passa pelo
+debounce de `ATRASO_DEBOUNCE_MS`) corrigia pro valor real (19 linhas numa
+tela de 1050px).
 
-Nada aqui é urgente: skip ≠ falha, o release sai normalmente (ver
-`.github/workflows/build-release.yml`), e a cobertura desse comportamento já
-existe e roda de verdade no Linux. Isso é só uma lacuna de cobertura
-especificamente no Windows.
+**O fix**: adicionar `time.sleep(ESPERA_DEBOUNCE_SEGUNDOS)` + `root.update()`
+após construir a tela e antes de ler `linhas_janela_grande`, para que o
+debounce complete e o `height` reflita o recálculo real. Com essa mudança o
+teste passa tanto no Windows desktop (1920x1080, confirmado) quanto no
+Linux.
+
+**No CI (`windows-latest`)**: ainda pode pular, dado que a tela do runner é
+fixa em ~768px e mesmo com o debounce a tabela pode continuar no piso — mas
+isso é uma limitação real da resolução daquele runner, não um bug no teste.
+A cobertura de verdade acontece no Linux CI (Xvfb com tela configurável) e
+agora também em qualquer máquina Windows real.
+
+## Contexto original (para referência)
+
+O texto abaixo é a investigação original que levou à descoberta do bug.
 
 ## Onde isso vive no código
 
