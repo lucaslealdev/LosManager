@@ -10,37 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  testes-linux:
-    # Roda os testes num Linux com Xvfb (tela virtual de 1366x1400),
-    # onde TODOS os testes de GUI passam de verdade — inclusive os de
-    # responsividade que no windows-latest pulam por causa da tela
-    # pequena (~768px) e da fonte Arial que consome mais espaço.
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout do código
-        uses: actions/checkout@v4
-
-      - name: Configurar Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "pip"
-          cache-dependency-path: requirements.txt
-
-      - name: Instalar Xvfb e dependências de sistema
-        run: sudo apt-get update && sudo apt-get install -y xvfb
-
-      - name: Instalar dependências Python
-        # pywin32 é só pra impressora térmica no Windows — não é
-        # importado por nenhum teste, então não precisa aqui.
-        run: pip install customtkinter Pillow
-
-      - name: Rodar a suíte de testes
-        run: python -m testes
-
   build:
-    needs: testes-linux
     runs-on: windows-latest
 
     steps:
@@ -58,6 +28,12 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install pyinstaller
+
+      - name: Rodar a suíte de testes
+        # Roda antes de gerar o executável: se algo quebrou, a build
+        # para aqui e não publica um release ruim. windows-latest tem
+        # sessão gráfica própria, então os testes de GUI rodam de verdade.
+        run: python -m testes
 
       - name: Calcular a versão semântica desta build
         # MAJOR.MINOR vêm do arquivo VERSION (versionado no repositório,
